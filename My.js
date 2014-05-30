@@ -1,15 +1,19 @@
 /*
-My JavaScript Library v1.0.0
-@name My
-@version 1.0.0
-@author luoying
-@date 2013-7-1
-@modify date 2014-5-7
-@copyright China
-*/
+ *************************************************************************************
+ ***  My JavaScript Library v1.0.0             **          **     ***     ***      ***
+ ***  @name:My                                 ****      ****      ***   ***       ***
+ ***  @version:1.0.0                           ** ***  **** *       **  ***        ***
+ ***  @author:luoying                          **     *    **        * ***         ***
+ ***  @date:2013-7-1                           **          **         ***          ***
+ ***  @modify:date 2014-5-7                    **          **        ***           ***
+ ***  @copyright:China                         **          **       ***            ***
+ ***  @comment:No support for old IE           **          **      ***             ***
+ *************************************************************************************
+ */
 (function() {
     var primitiveTypes = ['undefined', 'string', 'number', 'boolean'],
         toString = Object.prototype.toString,
+        slice = Array.prototype.slice,
 
         base = {
             isMy: function(obj) {
@@ -181,6 +185,15 @@ My JavaScript Library v1.0.0
                 return null;
             },
 
+            toArray: function(arrayLike) {
+                if (marray.isArrayLike(arrayLike)) {
+                    return marray.map(arrayLike, function(v) {
+                        return v;
+                    });
+                }
+                return [];
+            },
+
             repeat: function(a, count) {
                 if (mstring.isString(a))
                     return mstring.repeat(a, count);
@@ -218,40 +231,263 @@ My JavaScript Library v1.0.0
                 var prot = new F();
                 prot.constructor = subCls;
 
-                var len = arguments.length;
-                for (var i = 2; i < len; i++) {
-                    this.each(arguments[i], function(value, key) {
+                args = slice.call(arguments);
+                marray.each(args, function(v) {
+                    mobject.each(v, function(value, key) {
                         prot[key] = value;
-                    })
-                }
+                    });
+                }, 2);
 
                 subCls.prototype = prot;
-                subCls.superCls = superCls.prototype; //关联父级对象
+                subCls.superCls = superCls.prototype;
 
                 if (superCls.prototype.constructor === Object.prototype.constructor)
                     superCls.prototype.constructor = superCls;
+                return this;
             },
 
-            extend: function(dest) {
+            extend: function(dest, args) {
                 dest = dest || {};
-                this.each(arguments, function(obj) {
-                    if (obj !== dest) {
-                        base.each(obj, function(value, key) {
-                            dest[key] = value;
-                        });
-                    }
-                });
+                args = slice.call(arguments);
+                marray.each(args, function(v) {
+                    mobject.each(v, function(value, key) {
+                        dest[key] = value;
+                    });
+                }, 1);
+                return this;
             },
 
             augment: function(dest, source, methods) {
-                if (!marray.isArray(methods)) return;
+                if (marray.isArray(methods)) {
+                    dest = dest || {};
+                    source = source || {};
+                    marray.each(methods, function(value) {
+                        if (!dest.hasOwnProperty(value) && source.hasOwnProperty(value))
+                            dest[value] = source[value];
+                    });
+                }
+                return this;
+            },
 
-                dest = dest || {};
-                source = source || {};
-                this.each(methods, function(value) {
-                    if (!dest.hasOwnProperty(value) && source.hasOwnProperty(value))
-                        dest[value] = source[value];
+            plugin: function(name, lib) {
+                if (name && mobject.isPlainObject(lib)) {
+                    var ns = name.split('.'),
+                        l = ns.length,
+                        last = My;
+                    marray.each(ns, function(n, i) {
+                        if (!last[n]) last[n] = i == l - 1 ? lib : {};
+                        last = last[n];
+                    });
+                }
+                return this;
+            },
+
+            create: function(tag, text) {
+                return new _M_(mstring.isString(tag) && (tag.toUpperCase() === 'TEXT' && document.createTextNode(text) || document.createElement(tag)));
+            },
+
+            query: function(s, p) {
+                this.isMy(p) && (p = p[0]);
+                return this.toArray((p || document).querySelectorAll(s));
+            },
+
+            ajax: function(url, opts) {
+                opts = opts || {};
+
+                var loader = null;
+                if (opts.jsonp) {
+                    loader = new base.Jsonper();
+                    loader.callback = opts.callback || this.ajaxSettings.callback;
+                } else {
+                    loader = new base.Loader();
+                    opts.header && loader.beforeSend(opts.header);
+                    loader.method = (opts.method || this.ajaxSettings.method).toUpperCase();
+                    loader.params = opts.params || {};
+                }
+
+                loader.url = url;
+                loader.dataType = opts.dataType || this.ajaxSettings.dataType;
+                loader.parse = opts.parse === undefined ? this.ajaxSettings.parse : opts.parse;
+                loader.async = opts.async === undefined ? this.ajaxSettings.async : opts.async;
+                loader.cache = opts.cache === undefined ? this.ajaxSettings.cache : opts.cache;
+                loader.timeout = opts.timeout === undefined ? this.ajaxSettings.timeout : opts.timeout;
+
+                loader.once(eventType.SUCCESS, function(e) {
+                    opts.success && opts.success.call(this, this.data);
+                    this.release();
+                    loader = null;
                 });
+                loader.once(eventType.FAIL, function(e, x) {
+                    opts.fail && opts.fail.call(this, this, e, x);
+                    this.release();
+                    loader = null;
+                });
+                loader.once(eventType.DESTROY, function() {
+                    opts.abort && opts.abort.call(this);
+                    this.release();
+                    loader = null;
+                });
+                loader.once(eventType.TIMEOUT, function() {
+                    opts.ontimeout && opts.ontimeout.call(this);
+                    this.release();
+                    loader = null;
+                });
+
+                loader.send();
+                return loader;
+            },
+
+            getScript: function(url, callback) {
+                if (mstring.isString(url)) {
+                    var script = this.create('script');
+                    script.attr('type', 'text/javascript');
+                    script[0].onload = script[0].onreadystatechange = function() {
+                        if (!this.readyState || (this.readyState && (this.readyState == 'loaded' || this.readyState == 'complete'))) {
+                            script[0].onload = script[0].onreadystatechange = null;
+                            if (callback) callback.call(this);
+                            script.release();
+                        }
+                    }
+                    script.error(function() {
+                        if (callback) callback.call(this, 'load this script error!');
+                        script.release();
+                    });
+                    script.attr('src', url);
+                    My('head').append(script);
+                } else if (marray.isArray(url)) { //当是数组
+                    var count = 0,
+                        that = this,
+                        error = [],
+                        fn = function(e) {
+                            if (e)
+                                error.push(this.src);
+                            count++;
+                            if (count === url.length) {
+                                if (callback) callback.call(that, error);
+                            }
+                        };
+                    for (var i = 0; i < url.length; i++) {
+                        this.getScript(url[i], fn);
+                    }
+                }
+            },
+
+            getCSS: function(url) {
+                ///<signature>
+                ///<summary>动态加载一个远程CSS样式文件</summary>
+                ///<param name="url" type="String">远程CSS样式文件所在的URL地址</param>
+                ///</signature>
+                ///<signature>
+                ///<summary>按序列动态加载多个远程CSS样式文件</summary>
+                ///<param name="urls" type="Array">远程CSS样式文件所在的URL地址的数组集合</param>
+                ///</signature>
+
+                if (mstring.isString(url)) url = [url];
+
+                for (var i = 0, l = url.length; i < l; i++) {
+                    var css_link = M.create('link');
+                    css_link.attr({
+                        rel: 'stylesheet',
+                        type: 'text/css',
+                        href: url[i]
+                    });
+                    M('head').append(css_link);
+                }
+            },
+
+            stringify: function(data, type) {
+                ///<summary>序列化数据为文本，此方法负责按照指定的数据类型将其数据序列化为正确格式的字符串文本</summary>
+                ///<param name="data" type="Object">数据对象</param>
+                ///<param name="type" type="String" optional="true">指定的数据类型，其值为My.dataType中指定的数据类型之一，默认为JSON</param>
+                ///<returns type="String"/>
+
+                type = type || dataType.JSON;
+                switch (type) {
+                    case dataType.JSON:
+                        return JSON.stringify(data);
+                    case dataType.XML:
+                        return this.serializeXML(data);
+                }
+            },
+
+            parse: function(data, type) {
+                ///<summary>解析数据，数据内容是字符串，此方法负责按照指定的数据类型将其解析为正确格式的对象</summary>
+                ///<param name="data" type="String">数据内容</param>
+                ///<param name="type" type="String" optional="true">指定的数据类型，其值为My.dataType中指定的数据类型之一，默认为JSON</param>
+                ///<returns type="Object"/>
+
+                type = type || dataType.JSON;
+                switch (type) {
+                    case dataType.JSON:
+                        return JSON.parse(data);
+                    case dataType.XML:
+                        return base.parseXML(data);
+                }
+            },
+
+            serializeXML: function(xml) {
+                ///<summary>将一个XML文档序列化为未解析的XML标记的一个字符串</summary>
+                ///<param name="xml" type="Element">XML文档</param>
+                ///<returns type="String"/>
+
+                var txt = '';
+                try {
+                    if (window.XMLSerializer) { // W3C标准
+                        var serializer = new XMLSerializer();
+                        txt = serializer.serializeToString(xml);
+                    } else { //低版本IE
+                        txt = xml.xml;
+                    }
+                } catch (e) {}
+                return txt;
+            },
+
+            parseXML: function(data) {
+                ///<summary>解析XML内容，将其解析为XML文档对象</summary>
+                ///<param name="data" type="String">XML内容</param>
+                ///<returns type="Element"/>
+
+                if (!mstring.isString(data))
+                    return null;
+
+                var xml;
+                try {
+                    if (window.DOMParser) { // W3C标准
+                        var parser = new DOMParser();
+                        xml = parser.parseFromString(data, "text/xml");
+                    } else { // IE
+                        xml = new ActiveXObject("Microsoft.XMLDOM");
+                        xml.async = "false";
+                        xml.loadXML(data);
+                    }
+                } catch (e) {
+                    xml = null;
+                }
+                return xml;
+            },
+
+            on: function(tg, ty, fn, arg) {
+                isOriginalEvent(tg, ty) ? devent.on(tg, ty, fn, arg) : cevent.on(tg, ty, fn, arg);
+            },
+
+            once: function(tg, ty, fn, arg) {
+                isOriginalEvent(tg, ty) ? devent.once(tg, ty, fn, arg) : cevent.once(tg, ty, fn, arg);
+            },
+
+            off: function(tg, ty, fn) {
+                isOriginalEvent(tg, ty) ? devent.off(tg, ty, fn) : cevent.off(tg, ty, fn);
+            },
+
+            listened: function(tg, ty) {
+                return isOriginalEvent(tg, ty) ? devent.listened(tg, ty) : cevent.listened(tg, ty);
+            },
+
+            release: function(tg, ty) {
+                isOriginalEvent(tg, ty) ? devent.release(tg, ty) : cevent.release(tg, ty);
+            },
+
+            trigger: function(tg, ty, data, scope) {
+                isOriginalEvent(tg, ty) ? devent.trigger(tg, ty, data, scope) : cevent.trigger(tg, ty, data, scope);
             },
 
             now: function() {
@@ -1237,194 +1473,81 @@ My JavaScript Library v1.0.0
         }
     };
 
-    ///事件Event
-    base.Event = function(a, b) {
-        a = a || {};
+    ///定义事件类型（包含原生的DOM事件类型和已知的自定义事件类型）
+    var eventType = {},
+        originalEventTypes = [],
+        ///鼠标事件类型列表
+        mouseEventTypes = [
+            'click',
+            'dbclick',
+            'mousedown',
+            'mousemove',
+            'mouseup',
+            'mouseover',
+            'mouseout',
+            'mouseenter',
+            'mouseleave',
+            'mousewheel',
+            'drag',
+            'drop',
+            'dragstart',
+            'dragover',
+            'dragend',
+            'dragenter',
+            'dragleave'
+        ],
 
-        if (!(this instanceof base.Event))
-            return new base.Event(a, b);
+        ///键盘事件类型列表
+        keyEventTypes = [
+            'keydown',
+            'keypress',
+            'keyup'
+        ],
 
-        if (a.type) { //a是originalEvent，即DOM的原生事件
-            for (var k in a) {
-                //if (a.hasOwnProperty(k))
-                if (!mfn.isFunction(a[k]))
-                    this[k] = a[k];
-            }
-            this.originalEvent = a;
-            this.target = this.target || this.srcElement; //给IE的事件模型加入target属性
-            this.relatedTarget = this.relatedTarget || this.toElement || this.fromElement; //给IE的事件模型加入relatedTarget属性，相关对象
+        ///表单事件类型列表
+        formEventTypes = [
+            'submit',
+            'reset',
+            'change',
+            'formchange',
+            'forminput',
+            'input',
+            'invalid',
+            'blur',
+            'focus',
+            'select'
+        ],
 
-            var buttons = {
-                left: false,
-                middle: false,
-                right: false
-            }, isMouseEvent = marray.indexOf(mouseEventTypes, this.type) != -1;
-
-            if (isMouseEvent) {
-                //给IE的事件模型加上相对于文档原点的XY位置
-                if (this.pageX === undefined)
-                    this.pageX = this.clientX + document.documentElement.scrollLeft || document.body.scrollLeft;
-
-                if (this.pageY === undefined)
-                    this.pageY = this.clientY + document.documentElement.scrollTop || document.body.scrollTop;
-
-                if (this.keyCode === undefined && this.which !== undefined)
-                    this.keyCode = this.which;
-
-                if (this.which === undefined && this.keyCode !== undefined)
-                    this.which = this.keyCode;
-
-                if (this.wheelDelta !== undefined) {
-                    if (mclient.browser === 'opera' && mclient.version < 9.5)
-                        this.wheelDelta = -this.wheelDelta;
-                } else {
-                    this.wheelDelta = -this.detail * 40;
-                }
-
-                if (this.button !== undefined) {
-                    switch (this.button) {
-                        case 0:
-                            buttons.left = true;
-                            break;
-                        case 1:
-                            buttons.middle = true;
-                            break;
-                        case 2:
-                            buttons.right = true;
-                            break;
-                        default:
-                            break;
-                    }
-                }
-            } else if (this.button !== undefined) {
-                switch (this.button) {
-                    case 1:
-                        buttons.left = true;
-                        break;
-                    case 2:
-                        buttons.right = true;
-                        break;
-                    case 3:
-                        buttons.left = true;
-                        buttons.right = true;
-                        break;
-                    case 4:
-                        buttons.middle = true;
-                        break;
-                    case 5:
-                        buttons.left = true;
-                        buttons.middle = true;
-                        break;
-                    case 6:
-                        buttons.middle = true;
-                        buttons.right = true;
-                        break;
-                    case 7:
-                        buttons.left = true;
-                        buttons.middle = true;
-                        buttons.right = true;
-                        break;
-                    default:
-                        break;
-                }
-            } else {
-                buttons = null;
-            }
-            this.buttons = buttons;
-        } else { //a是自定义的绑定事件
-            this.type = a;
-            base.extend(this, b);
-        }
-        this.timeStamp = this.timeStamp || base.now(); //纪元时间戳
-    }
-
-    base.Event.prototype = {
-        stopPropagation: function() {
-            var e = this.originalEvent;
-            if (e) {
-                if (e.stopPropagation) {
-                    base.Event.prototype.stopPropagation = function() {
-                        var e = this.originalEvent;
-                        e && e.stopPropagation();
-                    }
-                } else {
-                    base.Event.prototype.stopPropagation = function() {
-                        var e = this.originalEvent;
-                        if (e) e.cancelBubble = true;
-                    }
-                }
-                this.stopPropagation();
-            }
-        },
-
-        preventDefault: function() {
-            var e = this.originalEvent;
-            if (e) {
-                if (e.preventDefault) {
-                    base.Event.prototype.preventDefault = function() {
-                        var e = this.originalEvent;
-                        e && e.preventDefault();
-                    }
-                } else {
-                    base.Event.prototype.preventDefault = function() {
-                        var e = this.originalEvent;
-                        if (e) e.returnValue = false;
-                    }
-                }
-                this.preventDefault();
-            }
-        },
-
-        getClipboardText: function() {
-            var e = this.originalEvent;
-            if (e) {
-                if (e.clipboardData) {
-                    base.Event.prototype.getClipboardText = function() {
-                        var e = this.originalEvent;
-                        return e && e.clipboardData.getData('text') || '';
-                    }
-                } else {
-                    base.Event.prototype.getClipboardText = function() {
-                        return window.clipboardData.getData('text') || '';
-                    }
-                }
-                this.getClipboardText();
-            }
-        },
-
-        setClipboardText: function(txt) {
-            var e = this.originalEvent;
-            if (e) {
-                if (e.clipboardData) {
-                    base.Event.prototype.setClipboardText = function(txt) {
-                        var e = this.originalEvent;
-                        e && e.clipboardData.setData('text/plain', txt);
-                    }
-                } else {
-                    base.Event.prototype.setClipboardText = function(txt) {
-                        window.clipboardData.setData('text', txt);
-                    }
-                }
-                this.setClipboardText(txt);
-            }
-        }
-    };
-
-    ///鼠标事件类型列表
-    var mouseEventTypes = ['mousedown', 'mousemove', 'mouseup', 'click', 'dbclick', 'mouseover', 'mouseout', 'mouseenter', 'mouseleave', 'mousewheel', 'drag', 'drop', 'dragend', 'dragenter', 'dragleave', 'dragover', 'dragstart'],
-
-        keyEventTypes = ['keydown', 'keypress', 'keyup'],
-
-        ///原生的DOM事件类型列表
-        originalEventTypes = mouseEventTypes.concat(keyEventTypes, ['submit', 'reset', 'change', 'formchange', 'forminput', 'input', 'invalid', 'blur', 'focus', 'select', 'contextmenu',
-            'resize', 'scroll', 'load', 'unload', 'DOMContentLoaded', 'message', 'online', 'offline', 'redo', 'undo', 'storage'
-        ]),
+        ///其他DOM事件类型列表
+        domEventTypes = [
+            'contextmenu',
+            'resize',
+            'scroll',
+            'load',
+            'DOMContentLoaded',
+            'unload',
+            'error',
+            'abort',
+            'message',
+            'open',
+            'online',
+            'offline',
+            'redo',
+            'undo',
+            'storage'
+        ],
 
         ///自定义事件类型列表
-        customEventTypes = ['loaded', 'complete', 'error', 'timeout', 'abort', 'timer', 'start', 'stop'],
-
-        ///定义事件类型（包含原生的DOM事件类型和已知的自定义事件类型）
-        eventType = {},
+        customEventTypes = [
+            'success',
+            'complete',
+            'fail',
+            'timeout',
+            'destroy',
+            'timer',
+            'start',
+            'stop'
+        ],
 
         ///事件处理函数句柄集合
         eventHandlers = {},
@@ -1434,6 +1557,10 @@ My JavaScript Library v1.0.0
 
         ///当前事件对象映射guid
         eventGuid = 0,
+
+        isOriginalEvent = function(tg, ty) {
+            return (base.isDomElement(tg) || tg == window || tg == document) && marray.contains(originalEventTypes, ty);
+        },
 
         ///合并原生的DOM事件类型和自定义事件类型
         mergeEvent = function() {
@@ -1456,20 +1583,18 @@ My JavaScript Library v1.0.0
             return guid;
         };
 
+    originalEventTypes = mouseEventTypes.concat(keyEventTypes, formEventTypes, domEventTypes);
     mergeEvent(originalEventTypes, customEventTypes);
 
-    function requestNewEvent(tg, ty, fn, isCustom) {
+    function requestNewEvent(tg, ty, fn) {
         var guid = getEventGuid(tg);
         if (!guid) { //尚未映射，则创建guid映射起来
-            guid = (isCustom ? '__events_' : 'events_') + (eventGuid++);
+            guid = 'events_' + (eventGuid++);
             eventTg[guid] = tg;
         }
 
-        if (!eventHandlers[guid])
-            eventHandlers[guid] = {};
-
-        if (!eventHandlers[guid][ty])
-            eventHandlers[guid][ty] = [];
+        eventHandlers[guid] || (eventHandlers[guid] = {});
+        eventHandlers[guid][ty] || (eventHandlers[guid][ty] = []);
 
         var handlers = eventHandlers[guid][ty];
         marray.each(handlers, function(v) {
@@ -1483,73 +1608,42 @@ My JavaScript Library v1.0.0
 
     ///针对DOM事件的一些方法
     var devent = {
-        add: function(tg, ty, fn, arg) {
-            if (tg.addEventListener) { //DOM2规范
-                this.add = function(tg, ty, fn, arg) {
-                    var guid = requestNewEvent(tg, ty, fn);
-                    if (!guid) return;
+        on: function(tg, ty, fn, arg) {
+            var guid = requestNewEvent(tg, ty, fn);
+            if (!guid) return;
 
-                    var handler = function(e) {
-                        var callee = arguments.callee;
-                        callee.fn.call(this, new base.Event(e), callee.arg); //将event对象作为参数传递给处理函数
-                    }
-                    handler.fn = fn;
-                    handler.arg = arg;
-                    eventHandlers[guid][ty].push(handler);
-                    tg.addEventListener(ty, handler, false);
-                }
-            } else { //低版本的IE
-                this.add = function(tg, ty, fn, arg) {
-                    var guid = requestNewEvent(tg, ty, fn);
-                    if (!guid) return;
-
-                    var handler = function(e) { //以使this对象指向target，否则会指向window全局对象
-                        var callee = arguments.callee;
-                        callee.fn.call(callee.tg, new base.Event(e || window.event), callee.arg); //将event对象作为参数传递给处理函数
-                    }
-                    handler.tg = tg;
-                    handler.fn = fn;
-                    handler.arg = arg;
-                    eventHandlers[guid][ty].push(handler);
-                    tg.attachEvent('on' + ty, handler);
-                }
+            var handler = function(e) {
+                var callee = arguments.callee;
+                callee.fn.call(this, e, callee.arg); //将event对象作为参数传递给处理函数
             }
-            this.add(tg, ty, fn, arg);
+            handler.fn = fn;
+            handler.arg = arg;
+            eventHandlers[guid][ty].push(handler);
+            tg.addEventListener(ty, handler, false);
         },
 
-        remove: function(tg, ty, fn) {
-            if (tg.removeEventListener) { //DOM2规范
-                this.remove = function(tg, ty, fn) {
-                    var handlers = this.handlers(tg, ty);
-                    marray.each(handlers, function(v, i) {
-                        if (v.fn === fn) {
-                            tg.removeEventListener(ty, v, false);
-                            handlers.splice(i, 1);
-                            delete v.fn;
-                            delete v.arg;
-                            return false;
-                        }
-                    });
+        off: function(tg, ty, fn) {
+            var handlers = this.handlers(tg, ty);
+            marray.each(handlers, function(v, i) {
+                if (v.fn === fn) {
+                    tg.removeEventListener(ty, v, false);
+                    handlers.splice(i, 1);
+                    delete v.fn;
+                    delete v.arg;
+                    return false;
                 }
-            } else { //低版本的IE
-                this.remove = function(tg, ty, fn) {
-                    var handlers = this.handlers(tg, ty);
-                    marray.each(handlers, function(v, i) {
-                        if (v.fn === fn) {
-                            tg.detachEvent('on' + ty, v);
-                            handlers.splice(i, 1);
-                            delete v.tg;
-                            delete v.fn;
-                            delete v.arg;
-                            return false;
-                        }
-                    });
-                }
-            }
-            this.remove(tg, ty, fn);
+            });
         },
 
-        has: function(tg, ty) {
+        once: function(tg, ty, fn, arg) {
+            var that = this;
+            this.on(tg, ty, function(e) {
+                that.off(tg, ty, arguments.callee);
+                fn.call(this, e, arg);
+            });
+        },
+
+        listened: function(tg, ty) {
             return this.handlers(tg, ty).length > 0;
         },
 
@@ -1571,81 +1665,46 @@ My JavaScript Library v1.0.0
         },
 
         releaseEvents: function(tg, ty, handlers) {
-            if (tg.removeEventListener) {
-                this.releaseEvents = function(tg, ty, handlers) {
-                    while (handlers.length) {
-                        var handler = handlers.shift();
-                        tg.removeEventListener(ty, handler, false);
-                        delete handler.fn;
-                        delete handler.arg;
-                    }
-                }
-            } else {
-                this.releaseEvents = function(tg, ty, handlers) {
-                    while (handlers.length) {
-                        var handler = handlers.shift();
-                        tg.detachEvent('on' + ty, handler);
-                        delete handler.tg;
-                        delete handler.fn;
-                        delete handler.arg;
-                    }
-                }
+            while (handlers.length) {
+                var handler = handlers.shift();
+                tg.removeEventListener(ty, handler, false);
+                delete handler.fn;
+                delete handler.arg;
             }
-            this.releaseEvents(tg, ty, handlers);
         },
 
-        trigger: function(tg, ty) {
-            if (document.createEvent) {
-                this.trigger = function(tg, ty) { //DOM2
-                    if (tg[ty]) {
-                        tg[ty]();
-                        return;
-                    }
-
-                    var ismouse = marray.indexOf(mouseEventTypes, ty) > -1;
-                    try {
-                        var e = document.createEvent(ismouse ? 'MouseEvents' : 'HTMLEvents');
-                        ismouse ? e.initMouseEvent(ty) : e.initEvent(ty, true, true);
-                        tg.dispatchEvent(e);
-                    } catch (err) {}
-                }
-            } else {
-                this.trigger = function(tg, ty) { //IE
-                    if (tg[ty]) {
-                        tg[ty]();
-                        return;
-                    }
-                    try {
-                        tg.fireEvent('on' + ty);
-                    } catch (err) {}
-                }
-            }
-            this.trigger(tg, ty);
+        trigger: function(tg, ty, data, scope) {
+            var ismouse = marray.indexOf(mouseEventTypes, ty) > -1;
+            try {
+                var e = document.createEvent(ismouse ? 'MouseEvents' : 'HTMLEvents');
+                data && (e.data = data);
+                scope || (scope = tg);
+                ismouse ? e.initMouseEvent(ty, true, true, tg.ownerDocument.defaultView, 1, 0, 0, 0, 0, false, false, false, false, 0, null) : e.initEvent(ty, true, true);
+                tg.dispatchEvent.call(scope, e);
+            } catch (err) {}
         }
     };
 
     ///针对自定义事件的一些方法
     var cevent = {
-        bind: function(tg, ty, fn, arg) {
-            var guid = requestNewEvent(tg, ty, fn, true);
+        on: function(tg, ty, fn, arg) {
+            var guid = requestNewEvent(tg, ty, fn);
             if (!guid) return;
 
-            var handler = function(e, arg) {
+            var handler = function(tg, ty, data) {
                 var callee = arguments.callee;
-                callee.fn.call(this, new base.Event(callee.ty, e), callee.arg); //将event对象作为参数传递给处理函数
+                callee.fn.call(this, new CustomEvent(tg, ty, data), callee.arg); //将event对象作为参数传递给处理函数
             }
-            handler.ty = ty;
             handler.fn = fn;
             handler.arg = arg;
             eventHandlers[guid][ty].push(handler);
         },
 
-        unbind: function(tg, ty, fn) {
+        off: function(tg, ty, fn) {
             var handlers = this.handlers(tg, ty);
             marray.each(handlers, function(v, i) {
                 if (v.fn === fn) {
                     handlers.splice(i, 1);
-                    delete v.ty;
                     delete v.fn;
                     delete v.arg;
                     return false;
@@ -1653,7 +1712,7 @@ My JavaScript Library v1.0.0
             });
         },
 
-        has: function(tg, ty) {
+        listened: function(tg, ty) {
             return this.handlers(tg, ty).length > 0;
         },
 
@@ -1677,51 +1736,26 @@ My JavaScript Library v1.0.0
         releaseEvents: function(handlers) {
             while (handlers.length) {
                 var handler = handlers.shift();
-                delete handler.ty;
                 delete handler.fn;
                 delete handler.arg;
             }
         },
 
-        fire: function(tg, ty, arg, scope) {
+        trigger: function(tg, ty, data, scope) {
             var handlers = this.handlers(tg, ty);
-            scope = scope || window;
+            scope = scope || tg;
             marray.each(handlers, function(v) {
-                v.call(scope, {
-                    target: tg,
-                    type: ty,
-                    timeStamp: base.now()
-                }, arg);
+                v.call(scope, tg, ty, data);
             });
         }
     };
 
-    base.extend(base, {
-        addEvent: function(tg, ty, fn, arg) {
-            marray.contains(originalEventTypes, ty) && devent.add(tg, ty, fn, arg) || cevent.bind(tg, ty, fn, arg);
-        },
-
-        removeEvent: function(tg, ty, fn) {
-            marray.contains(originalEventTypes, ty) && devent.remove(tg, ty, fn) || cevent.unbind(tg, ty, fn);
-        },
-
-        hasEvent: function(tg, ty) {
-            return marray.contains(originalEventTypes, ty) && devent.has(tg, ty) || cevent.has(tg, ty);
-        },
-
-        releaseEvent: function(tg, ty) {
-            if (ty === undefined) {
-                cevent.release(tg);
-                devent.release(tg);
-                return;
-            }
-            marray.contains(originalEventTypes, ty) && devent.release(tg, ty) || cevent.release(tg, ty);
-        },
-
-        triggerEvent: function(tg, ty, arg, scope) {
-            marray.contains(originalEventTypes, ty) && devent.trigger(tg, ty) || cevent.fire(tg, ty, arg, scope);
-        }
-    });
+    function CustomEvent(tg, ty, data) {
+        this.target = tg;
+        this.type = ty;
+        this.timeStamp = base.now();
+        this.data = data;
+    }
 
     ///自定义事件派发器，所有需要派发自定义事件的类都需要继承此事件派发器
     base.Dispatcher = function() {
@@ -1730,37 +1764,38 @@ My JavaScript Library v1.0.0
     }
 
     base.Dispatcher.prototype = {
-        bind: function(ty, fn, arg) {
-            cevent.bind(this, ty, fn, arg);
+        on: function(ty, fn, arg) {
+            cevent.on(this, ty, fn, arg);
         },
 
-        unbind: function(ty, fn) {
-            cevent.unbind(this, ty, fn);
+        off: function(ty, fn) {
+            cevent.off(this, ty, fn);
         },
 
-        hasBind: function(ty) {
-            return cevent.has(this, ty);
+        listened: function(ty) {
+            return cevent.listened(this, ty);
         },
 
         release: function(ty) {
             cevent.release(this, ty);
         },
 
-        fire: function(ty, arg, scope) {
-            cevent.fire(this, ty, arg, scope);
+        trigger: function(ty, data, scope) {
+            cevent.trigger(this, ty, data, scope);
         }
     }
 
     ///计时器
     base.Timer = function(delay, totalCount) {
-        if (this instanceof base.Timer) {
-            base.Dispatcher.call(this); //继承派发器，拥有绑定、松绑和派发自定义事件的能力
-            this.timer = -1; //计时器对象
-            this.delay = delay || 0; //周期时间间隔(秒)
-            this.curCount = 0; //当前已运行周期数
-            this.totalCount = totalCount || 0; //总周期数，当已运行周期数等于此值时，则停止计时器；默认为0，永不停止，除非手动调用stop()方法
-            this.running = false;
-        } else return new base.Timer(delay, totalCount);
+        if (!(this instanceof base.Timer))
+            return new base.Timer(delay, totalCount);
+
+        base.Dispatcher.call(this); //继承派发器，拥有绑定、松绑和派发自定义事件的能力
+        this.timer = -1; //计时器对象
+        this.delay = delay || 0; //周期时间间隔(秒)
+        this.curCount = 0; //当前已运行周期数
+        this.totalCount = totalCount || 0; //总周期数，当已运行周期数等于此值时，则停止计时器；默认为0，永不停止，除非手动调用stop()方法
+        this.running = false;
     };
 
     base.inherit(base.Timer, base.Dispatcher, {
@@ -1769,14 +1804,14 @@ My JavaScript Library v1.0.0
                 var _ = this;
                 this.timer = setInterval(function() {
                     _.curCount++;
-                    _.fire(eventType.TIMER, null, _);
+                    _.trigger(eventType.TIMER, null, _);
                     if (_.totalCount > 0 && _.curCount === _.totalCount) {
                         _.stop();
-                        _.fire(eventType.COMPLETE, null, _);
+                        _.trigger(eventType.COMPLETE, null, _);
                     }
                 }, this.delay * 1000);
                 this.running = true;
-                this.fire(eventType.START, null, this);
+                this.trigger(eventType.START, null, this);
             }
         },
 
@@ -1787,7 +1822,7 @@ My JavaScript Library v1.0.0
                 this.curCount = 0;
                 this.totalCount = 0;
                 this.running = false;
-                this.fire(eventType.STOP, null, this);
+                this.trigger(eventType.STOP, null, this);
             }
         },
 
@@ -1795,7 +1830,7 @@ My JavaScript Library v1.0.0
             if (this.timer != -1) {
                 this.curCount = 0;
                 this.running = false;
-                this.fire(eventType.RESET, null, this);
+                this.trigger(eventType.RESET, null, this);
             }
         }
     });
@@ -1859,62 +1894,39 @@ My JavaScript Library v1.0.0
         header: null
     }
 
-    ///HTTP请求器
-    base.getRequester = function() {
-        if (typeof XMLHttpRequest !== 'undefined') {
-            this.getRequester = function() {
-                return new XMLHttpRequest();
-            }
-        } else if (typeof ActiveXObject !== 'undefined') {
-            this.getRequester = function() {
-                if (typeof arguments.callee.activeString !== 'string') {
-                    marray.each(['MSXML2.XMLHttp.6.0', 'MSXML2.XMLHttp.3.0', 'MSXML2.XMLHttp'], function(v) {
-                        arguments.callee.activeString = v;
-                        return false;
-                    });
-                }
-                return new ActiveXObject(arguments.callee.activeString);
-            }
-        } else this.getRequester = function() {
-            throw new Error('Your browser is too lower,no support Ajax.');
-        }
-        return this.getRequester();
-    };
-
     ///数据加载器
     base.Loader = function(url, opts) {
-        if (this instanceof base.Loader) {
-            base.Dispatcher.call(this);
-            opts = opts || {};
-            this.url = url;
-            this.async = opts.async === undefined && base.ajaxSettings.async || opts.async;
-            this.method = (opts.method || base.ajaxSettings.method).toUpperCase();
-            this.params = opts.params; //发送到服务器的参数：键值对，仅POST有用，若是GET，设置此属性无效
-            this.dataType = opts.dataType || base.ajaxSettings.dataType;
-            this.contentType = opts.contentType || base.ajaxSettings.contentType;
-            this.parse = opts.parse === undefined && base.ajaxSettings.parse || opts.parse;
-            this.cache = opts.cache === undefined && base.ajaxSettings.cache || opts.cache;
-            this.timeout = opts.timeout === undefined && base.ajaxSettings.timeout || opts.timeout;
-            this.data = null; //数据内容，当服务器响应后，此属性被赋值为该响应内容，数据类型与dataType有关
-            this.header = null;
-            this.timeoutWatcher = null;
-            this.requester = base.getRequester();
-        } else return new base.Loader(url, opts);
+        if (!(this instanceof base.Loader))
+            return new base.Loader(url, opts);
+
+        base.Dispatcher.call(this);
+        opts = opts || {};
+        this.url = url;
+        this.async = opts.async === undefined && base.ajaxSettings.async || opts.async;
+        this.method = (opts.method || base.ajaxSettings.method).toUpperCase();
+        this.params = opts.params; //发送到服务器的参数：键值对，仅POST有用，若是GET，设置此属性无效
+        this.dataType = opts.dataType || base.ajaxSettings.dataType;
+        this.contentType = opts.contentType || base.ajaxSettings.contentType;
+        this.parse = opts.parse === undefined && base.ajaxSettings.parse || opts.parse;
+        this.cache = opts.cache === undefined && base.ajaxSettings.cache || opts.cache;
+        this.timeout = opts.timeout === undefined && base.ajaxSettings.timeout || opts.timeout;
+        this.data = null; //数据内容，当服务器响应后，此属性被赋值为该响应内容，数据类型与dataType有关
+        this.header = null;
+        this.timeoutWatcher = null;
+        this.requester = new XMLHttpRequest();
     }
 
     base.inherit(base.Loader, base.Dispatcher, {
         ///发送请求之前唯一的机会来设置头部信息
         beforeSend: function(header) {
-            if (mobject.isPlainObject(header))
-                this.header = header;
+            mobject.isPlainObject(header) && (this.header = header);
         },
 
         send: function(url) {
-            if (!mstring.isEmpty(url))
-                this.url = url;
+            mstring.isEmpty(url) || (this.url = url);
 
             if (mstring.isEmpty(this.url)) { //url为空或非法，触发错误事件，错误类型为url错
-                this.fire(eventType.ERROR, {
+                this.trigger(eventType.FAIL, {
                     code: errorCode.URL_ERROR,
                     message: 'url error'
                 }, this);
@@ -1943,31 +1955,22 @@ My JavaScript Library v1.0.0
             }
             this.requester.abort();
             this.data = null;
-            this.fire(eventType.ABORT, null, this);
+            this.trigger(eventType.DESTROY, null, this);
         }
     });
 
     function initializeLoader(loader) {
-        if (!loader.cache && loader.method === 'GET')
-            loader.url += (loader.url.indexOf('?') > -1 ? '&' : '?') + '_=' + base.now(); //在尾部加上日期毫秒数,保证不取缓存
-
+        loader.cache || loader.method !== 'GET' || (loader.url += (loader.url.indexOf('?') > -1 ? '&' : '?') + '_=' + base.now()); //在尾部加上日期毫秒数,保证不取缓存
         loader.requester.open(loader.method.toUpperCase(), loader.url, loader.async);
-
-        if (loader.header) {
-            mobject.each(loader.header, function(v, k) {
-                loader.requester.setRequestHeader(k, v);
-            });
-        }
-
+        loader.header && mobject.each(loader.header, function(v, k) {
+            loader.requester.setRequestHeader(k, v);
+        });
         loader.requester.setRequestHeader('Content-type', loader.contentType); //设置请求的数据类型头部
-
-        if (!loader.cache)
-            loader.requester.setRequestHeader('Cache-Control', 'no-cache'); //设置是否缓存头部
+        loader.cache || loader.requester.setRequestHeader('Cache-Control', 'no-cache'); //设置是否缓存头部
     }
 
     function setLoaderResult(loader) {
-        if (loader.timeout > 0)
-            clearTimeout(loader.timeoutWatcher);
+        loader.timeout && clearTimeout(loader.timeoutWatcher);
 
         if (loader.requester.readyState === 4) {
             if (loader.requester.status === 200) { //ok
@@ -1976,7 +1979,7 @@ My JavaScript Library v1.0.0
                     try {
                         d = parseLoaderData(loader.dataType, d, loader.requester.responseXML);
                     } catch (e) {
-                        loader.fire(eventType.ERROR, {
+                        loader.trigger(eventType.FAIL, {
                             code: errorCode.PARSE_ERROR,
                             message: 'JSON parse error'
                         }, loader);
@@ -1984,14 +1987,14 @@ My JavaScript Library v1.0.0
                     }
                 }
                 loader.data = d;
-                loader.fire(eventType.LOADED, null, loader);
+                loader.trigger(eventType.SUCCESS, null, loader);
             } else if (loader.requester.status === 404) { //not found
-                loader.fire(eventType.ERROR, {
+                loader.trigger(eventType.FAIL, {
                     code: errorCode.NOT_FOUND,
                     message: '404,Not Found'
                 }, loader);
             } else { //未知错误
-                loader.fire(eventType.ERROR, {
+                loader.trigger(eventType.FAIL, {
                     code: errorCode.IO_ERROR,
                     message: 'unknow error'
                 }, loader);
@@ -2008,7 +2011,7 @@ My JavaScript Library v1.0.0
 
     function setLoaderTimeout(loader) {
         loader.abort();
-        loader.fire(eventType.TIMEOUT, {
+        loader.trigger(eventType.TIMEOUT, {
             code: errorCode.TIME_OUT,
             message: 'time out error'
         }, loader);
@@ -2022,31 +2025,31 @@ My JavaScript Library v1.0.0
 
     ///JSONP加载器，跨域脚本请求
     base.Jsonper = function(url, opts) {
-        if (this instanceof base.Jsonper) {
-            base.Dispatcher.call(this);
-            opts = opts || {};
-            this.url = '';
-            this.async = opts.async === undefined ? base.ajaxSettings.async : opts.async;
-            this.dataType = opts.dataType || base.ajaxSettings.dataType;
-            this.parse = opts.parse === undefined ? base.ajaxSettings.parse : opts.parse;
-            this.cache = opts.cache === undefined ? base.ajaxSettings.cache : opts.cache;
-            this.timeout = opts.timeout === undefined ? base.ajaxSettings.timeout : opts.timeout;
-            this.callback = opts.callback || base.ajaxSettings.callback;
-            this.requestID = '';
-            this.callbackName = '';
-            this.data = null; //数据内容，当服务器响应后，此属性被赋值为该响应内容，数据类型与dataType有关
-            this.requester = null; //请求器，脚本元素
-            this.timeoutWatcher = null; //超时计时器
-        } else return new base.Jsonper(url, opts);
+        if (!(this instanceof base.Jsonper))
+            return new base.Jsonper(url, opts);
+
+        base.Dispatcher.call(this);
+        opts = opts || {};
+        this.url = '';
+        this.async = opts.async === undefined ? base.ajaxSettings.async : opts.async;
+        this.dataType = opts.dataType || base.ajaxSettings.dataType;
+        this.parse = opts.parse === undefined ? base.ajaxSettings.parse : opts.parse;
+        this.cache = opts.cache === undefined ? base.ajaxSettings.cache : opts.cache;
+        this.timeout = opts.timeout === undefined ? base.ajaxSettings.timeout : opts.timeout;
+        this.callback = opts.callback || base.ajaxSettings.callback;
+        this.requestID = '';
+        this.callbackName = '';
+        this.data = null; //数据内容，当服务器响应后，此属性被赋值为该响应内容，数据类型与dataType有关
+        this.requester = null; //请求器，脚本元素
+        this.timeoutWatcher = null; //超时计时器
     }
 
     base.inherit(base.Jsonper, base.Dispatcher, {
         send: function(url) {
-            if (!mstring.isEmpty(url))
-                this.url = url;
+            mstring.isEmpty(url) || (this.url = url);
 
             if (mstring.isEmpty(this.url)) { //url为空或非法，触发错误事件，错误类型为url错
-                this.fire(eventType.ERROR, {
+                this.trigger(eventType.FAIL, {
                     code: errorCode.URL_ERROR,
                     message: 'url error'
                 }, this);
@@ -2057,15 +2060,12 @@ My JavaScript Library v1.0.0
             this.callbackName = this.requestID + '_callback'; //本次请求服务器返回的js函数名
             this.url += (this.url.indexOf('?') === -1 ? '?' : '&') + this.callback + '=' + this.callbackName; //请求路径
 
-            if (!this.cache && this.method === 'GET')
-                this.url += '&_=' + base.now(); //在尾部加上日期毫秒数,保证不取缓存
+            this.cache || this.method !== 'GET' || (this.url += '&_=' + base.now()); //在尾部加上日期毫秒数,保证不取缓存
 
             this.requester = document.createElement('script'); //创建脚本元素
             this.requester.setAttribute('id', this.requestID);
             this.requester.setAttribute('type', 'text/javascript');
-
-            if (this.async)
-                this.requester.setAttribute('async', 'async'); //规定脚本将被异步执行
+            this.async && this.requester.setAttribute('async', 'async'); //规定脚本将被异步执行
 
             var that = this;
             //请求成功完毕，服务器返回的js函数，参数中就包含了请求所得到的数据内容
@@ -2094,7 +2094,7 @@ My JavaScript Library v1.0.0
             this.requester = null;
             delete callbacks[this.callbackName];
             this.callbackName = '';
-            if (!successed) this.fire(eventType.ABORT, null, this);
+            successed || this.trigger(eventType.DESTROY, null, this);
         }
     });
 
@@ -2104,7 +2104,7 @@ My JavaScript Library v1.0.0
                 data = parseXssData(xss.dataType, data);
             } catch (e) {
                 xss.abort();
-                xss.fire(eventType.ERROR, {
+                xss.trigger(eventType.FAIL, {
                     code: errorCode.PARSE_ERROR,
                     message: 'JSON parse error'
                 }, xss);
@@ -2112,7 +2112,7 @@ My JavaScript Library v1.0.0
             }
         }
         xss.data = d;
-        xss.fire(eventType.LOADED, null, xss);
+        xss.trigger(eventType.SUCCESS, null, xss);
         xss.abort(true);
     }
 
@@ -2125,7 +2125,7 @@ My JavaScript Library v1.0.0
 
     function setXssError(xss) {
         xss.abort();
-        xss.fire(eventType.ERROR, {
+        xss.trigger(eventType.FAIL, {
             code: errorCode.IO_ERROR,
             message: 'unknow error'
         }, xss);
@@ -2133,7 +2133,7 @@ My JavaScript Library v1.0.0
 
     function setXssTimeout(xss) {
         xss.abort();
-        xss.fire(eventType.TIMEOUT, {
+        xss.trigger(eventType.TIMEOUT, {
             code: errorCode.TIME_OUT,
             message: 'time out error'
         }, xss);
@@ -3750,7 +3750,7 @@ My JavaScript Library v1.0.0
             ///<returns type="My"/>
 
             this.each(function() {
-                devent.add(this, ty, fn, arg);
+                devent.on(this, ty, fn, arg);
             });
             return this;
         },
@@ -3764,7 +3764,7 @@ My JavaScript Library v1.0.0
             ///<returns type="My"/>
 
             this.each(function() {
-                devent.remove(this, ty, fn);
+                devent.off(this, ty, fn);
             });
             return this;
         },
@@ -4299,290 +4299,25 @@ My JavaScript Library v1.0.0
     function registerLoad(fn) {
         readyfns.push(fn);
         if (!isRegisterLoad) {
-            My.addEvent(document, eventType.DOMCONTENTLOADED, completed);
-            My.addEvent(window, eventType.LOAD, completed);
+            My.on(document, eventType.DOMCONTENTLOADED, completed);
+            My.on(window, eventType.LOAD, completed);
         }
         isRegisterLoad = true;
     }
 
     function completed() {
-        My.removeEvent(document, eventType.DOMCONTENTLOADED, completed);
-        My.removeEvent(window, eventType.LOAD, completed);
+        My.off(document, eventType.DOMCONTENTLOADED, completed);
+        My.off(window, eventType.LOAD, completed);
         My.isReady = true;
         marray.each(readyfns, function(fn) {
             fn.call(My);
         });
     }
 
-    base.extend(base, {
-        develop: function(args) {
-            ///<summary>
-            ///动态开发My库，以使得My扩容，获得扩展开发的能力
-            ///</summary>
-            ///<param name="args" type="Object">需要扩展的属性或函数字面量对象；可以传入一个或多个字面量对象参数</param>
-            ///<returns type="My"/>
-
-            var l = arguments.length;
-            while (l--) this.extend(My, arguments[l]);
-            return this;
-        },
-
-        plugin: function(name, lib) {
-            ///<summary>
-            ///绑定插件，使得My获得此插件的开发能力
-            ///&#10;此函数不同于develp和extend，它将在My对象之下缔造新的命名空间，该命名空间中绑定了此插件的所有功能
-            ///</summary>
-            ///<param name="name" type="String">
-            ///插件的名称，即新命名空间，此后便可以通过此名称来访问该插件的内容
-            ///&#10;例如一个插件的名称为Map，则可以这样访问：My.Map.add()
-            ///&#10;插件名称不能与其他插件冲突，必须保证唯一性，否则绑定插件不能成功
-            ///&#10;此名称可以有子命名空间，如：Map.Overlays或Map.Overlays.Event
-            ///</param>
-            ///<param name="lib" type="Object">此插件的功能库，包含了所有属性和函数</param>
-            ///<returns type="My"/>
-
-            if (name && mobject.isPlainObject(lib)) {
-                var ns = name.split('.'),
-                    i = 0,
-                    l = ns.length,
-                    n, last = My;
-                for (; i < l; i++) {
-                    n = ns[i];
-                    if (!last[n]) last[n] = i == l - 1 ? lib : {};
-                    last = last[n];
-                }
-            }
-            return this;
-        },
-
-        create: function(tag, text) {
-            ///<summary>根据标签名创建元素或文本节点</summary>
-            ///<param name="tag" type="String">标签名称，无论大小写</param>
-            ///<param name="text" type="String" optional="true">设置文本节点的文本内容，只当是创建文本节点时，此值才有效</param>
-            ///<returns type="My"/>
-
-            var c;
-            if (mstring.isString(tag)) {
-                tag = tag.toUpperCase();
-                c = (tag === 'TEXT' ? document.createTextNode(text) : document.createElement(tag));
-            }
-            return new _M_(c);
-        },
-
-        query: function(s, p) {
-            if (this.isMy(p))
-                p = p[0];
-            return (p || document).querySelectorAll(s);
-        },
-
-        ajax: function(url, opts) {
-            ///<summary>Ajax请求，根据传入的URL和可选参数，请求远程数据</summary>
-            ///<param name="url" type="String">远程数据的URL地址</param>
-            ///<param name="opts" type="Object" optional="true">设置给加载器的选项集合，具体内容参照ajaxSettings</param>
-            ///<returns type="My.Loader|My.Jsonper"/>
-
-            opts = opts || {};
-            var loader = null;
-            if (opts.jsonp) { //JSONP
-                loader = new base.Jsonper();
-                loader.callback = opts.callback || this.ajaxSettings.callback;
-            } else {
-                loader = new base.Loader();
-                if (opts.header)
-                    loader.beforeSend(opts.header);
-
-                loader.method = (opts.method || this.ajaxSettings.method).toUpperCase();
-                loader.params = opts.params || {};
-            }
-            loader.url = url;
-            loader.dataType = opts.dataType || this.ajaxSettings.dataType;
-            loader.parse = opts.parse === undefined ? this.ajaxSettings.parse : opts.parse;
-            loader.async = opts.async === undefined ? this.ajaxSettings.async : opts.async;
-            loader.cache = opts.cache === undefined ? this.ajaxSettings.cache : opts.cache;
-            loader.timeout = opts.timeout === undefined ? this.ajaxSettings.timeout : opts.timeout;
-            loader.bind(eventType.LOADED, function(e) {
-                if (opts.success)
-                    opts.success.call(this, this.data);
-                this.release();
-                loader = null;
-            });
-            loader.bind(eventType.ERROR, function(e, x) {
-                if (opts.error)
-                    opts.error.call(this, this, e, x);
-                this.release();
-                loader = null;
-            });
-            loader.bind(eventType.ABORT, function() {
-                if (opts.abort)
-                    opts.abort.call(this);
-                this.release();
-                loader = null;
-            });
-            loader.bind(eventType.TIMEOUT, function() {
-                if (opts.ontimeout)
-                    opts.ontimeout.call(this);
-                this.release();
-                loader = null;
-            });
-            loader.send();
-            return loader;
-        },
-
-        getScript: function(url, callback) {
-            ///<signature>
-            ///<summary>动态加载一个远程JS脚本文件</summary>
-            ///<param name="url" type="String">远程JS脚本文件所在的URL地址</param>
-            ///<param name="callback" type="Function">
-            ///当远程脚本加载完毕或加载失败，将会触发此回调函数
-            ///&#10;此函数的this将会指向该脚本元素，若加载失败，会有一个描述错误信息的参数
-            ///</param>
-            ///</signature>
-            ///<signature>
-            ///<summary>按序列动态加载多个远程JS脚本文件</summary>
-            ///<param name="url" type="Array">远程JS脚本文件所在的URL地址的数组集合</param>
-            ///<param name="callback" type="Function">
-            ///当所有远程脚本加载完毕或加载失败，将会触发此回调函数
-            ///&#10;此函数的this将会指向My对象，此时将会有一个参数，用于放置加载失败的脚本url数组，可以通过这个参数来知道哪些脚本文件加载失败了
-            ///</param>
-            ///</signature>
-
-            if (mstring.isString(url)) {
-                var script = this.create('script');
-                script.attr('type', 'text/javascript');
-                script[0].onload = script[0].onreadystatechange = function() {
-                    if (!this.readyState || (this.readyState && (this.readyState == 'loaded' || this.readyState == 'complete'))) {
-                        script[0].onload = script[0].onreadystatechange = null;
-                        if (callback) callback.call(this);
-                        script.release();
-                    }
-                }
-                script.error(function() {
-                    if (callback) callback.call(this, 'load this script error!');
-                    script.release();
-                });
-                script.attr('src', url);
-                My('head').append(script);
-            } else if (marray.isArray(url)) { //当是数组
-                var count = 0,
-                    that = this,
-                    error = [],
-                    fn = function(e) {
-                        if (e)
-                            error.push(this.src);
-                        count++;
-                        if (count === url.length) {
-                            if (callback) callback.call(that, error);
-                        }
-                    };
-                for (var i = 0; i < url.length; i++) {
-                    this.getScript(url[i], fn);
-                }
-            }
-        },
-
-        getCSS: function(url) {
-            ///<signature>
-            ///<summary>动态加载一个远程CSS样式文件</summary>
-            ///<param name="url" type="String">远程CSS样式文件所在的URL地址</param>
-            ///</signature>
-            ///<signature>
-            ///<summary>按序列动态加载多个远程CSS样式文件</summary>
-            ///<param name="urls" type="Array">远程CSS样式文件所在的URL地址的数组集合</param>
-            ///</signature>
-
-            if (mstring.isString(url)) url = [url];
-
-            for (var i = 0, l = url.length; i < l; i++) {
-                var css_link = M.create('link');
-                css_link.attr({
-                    rel: 'stylesheet',
-                    type: 'text/css',
-                    href: url[i]
-                });
-                M('head').append(css_link);
-            }
-        },
-
-        stringify: function(data, type) {
-            ///<summary>序列化数据为文本，此方法负责按照指定的数据类型将其数据序列化为正确格式的字符串文本</summary>
-            ///<param name="data" type="Object">数据对象</param>
-            ///<param name="type" type="String" optional="true">指定的数据类型，其值为My.dataType中指定的数据类型之一，默认为JSON</param>
-            ///<returns type="String"/>
-
-            type = type || dataType.JSON;
-            switch (type) {
-                case dataType.JSON:
-                    return JSON.stringify(data);
-                case dataType.XML:
-                    return this.serializeXML(data);
-            }
-        },
-
-        parse: function(data, type) {
-            ///<summary>解析数据，数据内容是字符串，此方法负责按照指定的数据类型将其解析为正确格式的对象</summary>
-            ///<param name="data" type="String">数据内容</param>
-            ///<param name="type" type="String" optional="true">指定的数据类型，其值为My.dataType中指定的数据类型之一，默认为JSON</param>
-            ///<returns type="Object"/>
-
-            type = type || dataType.JSON;
-            switch (type) {
-                case dataType.JSON:
-                    return JSON.parse(data);
-                case dataType.XML:
-                    return base.parseXML(data);
-            }
-        },
-
-        serializeXML: function(xml) {
-            ///<summary>将一个XML文档序列化为未解析的XML标记的一个字符串</summary>
-            ///<param name="xml" type="Element">XML文档</param>
-            ///<returns type="String"/>
-
-            var txt = '';
-            try {
-                if (window.XMLSerializer) { // W3C标准
-                    var serializer = new XMLSerializer();
-                    txt = serializer.serializeToString(xml);
-                } else { //低版本IE
-                    txt = xml.xml;
-                }
-            } catch (e) {}
-            return txt;
-        },
-
-        parseXML: function(data) {
-            ///<summary>解析XML内容，将其解析为XML文档对象</summary>
-            ///<param name="data" type="String">XML内容</param>
-            ///<returns type="Element"/>
-
-            if (!mstring.isString(data))
-                return null;
-
-            var xml;
-            try {
-                if (window.DOMParser) { // W3C标准
-                    var parser = new DOMParser();
-                    xml = parser.parseFromString(data, "text/xml");
-                } else { // IE
-                    xml = new ActiveXObject("Microsoft.XMLDOM");
-                    xml.async = "false";
-                    xml.loadXML(data);
-                }
-            } catch (e) {
-                xml = null;
-            }
-            return xml;
-        }
-    });
-
     base.plugin('Color', mcolor);
 
-    ///My JS Library
+
     function My(s, p) {
-        ///<field name="name" static="true" type="String">My JS库名称</field>
-        ///<field name="version" static="true" type="String">My JS库版本号</field>
-        ///<field name="isReady" static="true" type="Boolean">页面是否准备完毕</field>
-        ///<field name="ready" static="true" type="Function">页面准备完毕的回调函数</field>
         return new _M_(s, p);
     }
 
