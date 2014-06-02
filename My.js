@@ -1,14 +1,14 @@
 /*
- *************************************************************************************
- ***  My JavaScript Library v1.0.0             **          **     ***     ***      ***
- ***  @name:My                                 ****      ****      ***   ***       ***
- ***  @version:1.0.0                           ** ***  **** *       **  ***        ***
- ***  @author:luoying                          **     *    **        * ***         ***
- ***  @date:2013-7-1                           **          **         ***          ***
- ***  @modify:date 2014-5-7                    **          **        ***           ***
- ***  @copyright:China                         **          **       ***            ***
- ***  @comment:No support for old IE           **          **      ***             ***
- *************************************************************************************
+ ***********************************************************************************************
+ ***  My JavaScript Library v1.0.0             **          **     ***     ***                ***
+ ***  @name:My                                 ****      ****      ***   ***                 ***
+ ***  @version:1.0.0                           ** ***  **** *       **  ***                  ***
+ ***  @author:Luoying                          **     *    **        * ***                   ***
+ ***  @date:2013-7-1                           **          **         ***                    ***
+ ***  @modify:date 2014-5-7                    **          **        ***                     ***
+ ***  @copyright:China                         **          **       ***                      ***
+ ***  @comment:No support for old browser      **          **      ***                       ***
+ ***********************************************************************************************
  */
 (function() {
     var primitiveTypes = ['undefined', 'string', 'number', 'boolean'],
@@ -46,7 +46,7 @@
                 return mobject.clone(data, isDepth);
             },
 
-            each: function(a, fn, arg) {
+            each: function(a, fn, arg, context) {
                 if (marray.isArray(a) || marray.isArrayLike(a))
                     return marray.each.apply(this, arguments);
 
@@ -54,25 +54,25 @@
                     return mobject.each.apply(this, arguments);
             },
 
-            reach: function(a, fn, arg) {
+            reach: function(a, fn, arg, context) {
                 if (marray.isArray(a) || marray.isArrayLike(a))
                     return marray.reach.apply(this, arguments);
             },
 
-            filter: function(a, fn, arg) {
+            filter: function(a, fn, arg, context) {
                 if (marray.isArray(a))
-                    return marray.filter(a, fn, arg);
+                    return marray.filter.apply(this, arguments);
 
                 if (mobject.isPlainObject(a))
-                    return mobject.filter(a, fn, arg);
+                    return mobject.filter.apply(this, arguments);
             },
 
-            map: function(a, fn, arg) {
+            map: function(a, fn, arg, context) {
                 if (marray.isArray(a))
-                    return marray.map(a, fn, arg);
+                    return marray.map.apply(this, arguments);
 
                 if (mobject.isPlainObject(a))
-                    return mobject.map(a, fn, arg);
+                    return mobject.map.apply(this, arguments);
             },
 
             equals: function(a, b) {
@@ -117,26 +117,6 @@
                     return mobject.size(a);
 
                 return 0;
-            },
-
-            indexOf: function(a, e, start) {
-                if (mstring.isString(a))
-                    return a.indexOf(e, start);
-
-                if (marray.isArray(a))
-                    return marray.indexOf(a, e, start);
-
-                return -1;
-            },
-
-            lastIndexOf: function(a, e, start) {
-                if (mstring.isString(a))
-                    return a.lastIndexOf(e, start);
-
-                if (marray.isArray(a))
-                    return marray.lastIndexOf(a, e, start);
-
-                return -1;
             },
 
             empty: function(type) {
@@ -312,26 +292,23 @@
                 loader.cache = opts.cache === undefined ? this.ajaxSettings.cache : opts.cache;
                 loader.timeout = opts.timeout === undefined ? this.ajaxSettings.timeout : opts.timeout;
 
-                loader.once(eventType.SUCCESS, function(e) {
-                    opts.success && opts.success.call(this, this.data);
-                    this.release();
-                    loader = null;
-                });
-                loader.once(eventType.FAIL, function(e, x) {
-                    opts.fail && opts.fail.call(this, this, e, x);
-                    this.release();
-                    loader = null;
-                });
-                loader.once(eventType.DESTROY, function() {
-                    opts.abort && opts.abort.call(this);
-                    this.release();
-                    loader = null;
-                });
-                loader.once(eventType.TIMEOUT, function() {
-                    opts.ontimeout && opts.ontimeout.call(this);
-                    this.release();
-                    loader = null;
-                });
+                loader.once({
+                    'success': function(e) {
+                        opts.success && opts.success.call(this, this.data);
+                        this.release();
+                        loader = null;
+                    },
+                    'fail': function(e, x) {
+                        opts.fail && opts.fail.call(this, this, e, x);
+                        this.release();
+                        loader = null;
+                    },
+                    'timeout': function() {
+                        opts.ontimeout && opts.ontimeout.call(this);
+                        this.release();
+                        loader = null;
+                    }
+                })
 
                 loader.send();
                 return loader;
@@ -339,114 +316,78 @@
 
             getScript: function(url, callback) {
                 if (mstring.isString(url)) {
-                    var script = this.create('script');
-                    script.attr('type', 'text/javascript');
+                    var script = this.create('script').attr('type', 'text/javascript').error(function() {
+                        callback && callback.call(this, 'This script is loaded error!');
+                        script.release();
+                    });
+
                     script[0].onload = script[0].onreadystatechange = function() {
                         if (!this.readyState || (this.readyState && (this.readyState == 'loaded' || this.readyState == 'complete'))) {
                             script[0].onload = script[0].onreadystatechange = null;
-                            if (callback) callback.call(this);
+                            callback && callback.call(this);
                             script.release();
                         }
-                    }
-                    script.error(function() {
-                        if (callback) callback.call(this, 'load this script error!');
-                        script.release();
-                    });
+                    };
+
                     script.attr('src', url);
                     My('head').append(script);
-                } else if (marray.isArray(url)) { //当是数组
+                } else if (marray.isArray(url)) {
                     var count = 0,
                         that = this,
-                        error = [],
+                        fails = [],
                         fn = function(e) {
-                            if (e)
-                                error.push(this.src);
+                            e && fails.push(this.src);
                             count++;
-                            if (count === url.length) {
-                                if (callback) callback.call(that, error);
-                            }
+                            count === url.length && callback && callback.call(that, fails);
                         };
-                    for (var i = 0; i < url.length; i++) {
-                        this.getScript(url[i], fn);
-                    }
+                    marray.each(url, function(v) {
+                        base.getScript(v, fn);
+                    });
                 }
             },
 
             getCSS: function(url) {
-                ///<signature>
-                ///<summary>动态加载一个远程CSS样式文件</summary>
-                ///<param name="url" type="String">远程CSS样式文件所在的URL地址</param>
-                ///</signature>
-                ///<signature>
-                ///<summary>按序列动态加载多个远程CSS样式文件</summary>
-                ///<param name="urls" type="Array">远程CSS样式文件所在的URL地址的数组集合</param>
-                ///</signature>
+                mstring.isString(url) && (url = [url]);
 
-                if (mstring.isString(url)) url = [url];
-
-                for (var i = 0, l = url.length; i < l; i++) {
-                    var css_link = M.create('link');
-                    css_link.attr({
+                marray.each(url, function(v) {
+                    M('head').append(base.create('link').attr({
                         rel: 'stylesheet',
                         type: 'text/css',
-                        href: url[i]
-                    });
-                    M('head').append(css_link);
-                }
+                        href: v
+                    }));
+                });
             },
 
             stringify: function(data, type) {
-                ///<summary>序列化数据为文本，此方法负责按照指定的数据类型将其数据序列化为正确格式的字符串文本</summary>
-                ///<param name="data" type="Object">数据对象</param>
-                ///<param name="type" type="String" optional="true">指定的数据类型，其值为My.dataType中指定的数据类型之一，默认为JSON</param>
-                ///<returns type="String"/>
-
-                type = type || dataType.JSON;
-                switch (type) {
-                    case dataType.JSON:
-                        return JSON.stringify(data);
-                    case dataType.XML:
-                        return this.serializeXML(data);
-                }
+                return {
+                    json: JSON.stringify(data),
+                    xml: this.serializeXML(data)
+                }[type || dataType.JSON];
             },
 
             parse: function(data, type) {
-                ///<summary>解析数据，数据内容是字符串，此方法负责按照指定的数据类型将其解析为正确格式的对象</summary>
-                ///<param name="data" type="String">数据内容</param>
-                ///<param name="type" type="String" optional="true">指定的数据类型，其值为My.dataType中指定的数据类型之一，默认为JSON</param>
-                ///<returns type="Object"/>
-
-                type = type || dataType.JSON;
-                switch (type) {
-                    case dataType.JSON:
-                        return JSON.parse(data);
-                    case dataType.XML:
-                        return base.parseXML(data);
-                }
+                return {
+                    json: JSON.parse(data),
+                    xml: this.parseXML(data)
+                }[type || dataType.JSON];
             },
 
             serializeXML: function(xml) {
-                ///<summary>将一个XML文档序列化为未解析的XML标记的一个字符串</summary>
-                ///<param name="xml" type="Element">XML文档</param>
-                ///<returns type="String"/>
-
                 var txt = '';
                 try {
                     if (window.XMLSerializer) { // W3C标准
                         var serializer = new XMLSerializer();
                         txt = serializer.serializeToString(xml);
-                    } else { //低版本IE
+                    } else { //IE
                         txt = xml.xml;
                     }
-                } catch (e) {}
+                } catch (e) {
+                    txt = '';
+                }
                 return txt;
             },
 
             parseXML: function(data) {
-                ///<summary>解析XML内容，将其解析为XML文档对象</summary>
-                ///<param name="data" type="String">XML内容</param>
-                ///<returns type="Element"/>
-
                 if (!mstring.isString(data))
                     return null;
 
@@ -455,7 +396,7 @@
                     if (window.DOMParser) { // W3C标准
                         var parser = new DOMParser();
                         xml = parser.parseFromString(data, "text/xml");
-                    } else { // IE
+                    } else { //IE
                         xml = new ActiveXObject("Microsoft.XMLDOM");
                         xml.async = "false";
                         xml.loadXML(data);
@@ -498,90 +439,6 @@
                 return '';
             }
         },
-
-        getClient = function() {
-            var browser = '',
-                version = 0,
-                platform = '',
-                os = '',
-                ua = navigator.userAgent;
-
-            //检测浏览器及其版本号
-            if (window.opera) {
-                browser = 'opera';
-                version = opera.version();
-            } else if (/AppleWebKit\/(\S+)/.test(ua)) {
-                //确定是chrome还是safari
-                if (/OPR\/(\S+)/.test(ua)) {
-                    browser = 'opera';
-                    version = RegExp['$1'];
-                } else if (/Chrome\/(\S+)/.test(ua)) {
-                    browser = 'chrome';
-                    version = RegExp['$1'];
-                } else if (/Version\/(\S+)/.test(ua)) {
-                    browser = 'safari';
-                    version = RegExp['$1'];
-                }
-            } else if (/KHTML\/(\S+)/.test(ua) || /Konqueror\/([^;]+)/.test(ua)) {} else if (/rv:([^\)]+)\)\s?\w* Gecko\/?/.test(ua)) {
-                version = RegExp['$1'];
-                if (/Firefox\/(\S+)/.test(ua)) { //确定是不是firefox
-                    browser = 'firefox';
-                    version = RegExp['$1'];
-                } else if (/Trident/.test(ua)) { //IE11
-                    browser = 'ie';
-                } else version = 0;
-            } else if (/MSIE ([^;]+)/.test(ua)) {
-                browser = 'ie';
-                version = RegExp['$1'];
-            } else if (/bingbot\/(\S+)/.test(ua)) {
-                browser = 'bingbot';
-                version = RegExp['$1'];
-            }
-
-            var p = navigator.platform;
-            //检测平台
-            if (p.indexOf('Win') === 0)
-                platform = 'win';
-            else if (p.indexOf('Mac') === 0)
-                platform = os = 'mac';
-            else if ((p.indexOf('x11') === 0) || (p.indexOf('Linux') === 0))
-                platform = os = 'linux';
-            else if (p.indexOf('iPhone') > -1)
-                platform = os = 'iphone';
-            else if (p.indexOf('ipad') > -1)
-                platform = os = 'ipad';
-            else if (p.indexOf('iPod') > -1)
-                platform = os = 'iPod';
-            else if (p.indexOf('nokiaN') > -1)
-                platform = os = 'nokia';
-            else if (p.indexOf('Wii') > -1)
-                platform = os = 'Wii';
-
-            //检测操作系统
-            if (platform === 'win') {
-                if (/Win(?:dows )?([^do]{2})\s?(\d+\.\d+)?/.test(ua)) {
-                    var ax = RegExp['$1'];
-                    if (ax === 'NT') {
-                        os = {
-                            '5.0': '2000',
-                            '5.1': 'XP',
-                            '6.0': 'Vista',
-                            '6.1': 'Win7'
-                        }[RegExp.$2] || 'NT';
-                    } else if (ax === '9x') os = 'ME';
-                    else os = ax;
-                }
-            }
-            return {
-                browser: browser,
-                version: version,
-                platform: platform,
-                os: os
-            }
-        },
-
-        ///客户端信息：平台、操作系统、浏览器、浏览器版本等
-        mclient = getClient(),
 
         guidStr = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$',
 
@@ -648,8 +505,7 @@
 
         range: function(first, second, step) {
             var s = marray.range(first, second, step);
-            if (!s) return '';
-            return s.join('');
+            return s && s.join('') || '';
         },
 
         fill: function(s, start, number, value) {
@@ -706,7 +562,7 @@
             if (!this.isString(s))
                 return '';
 
-            join = (join === undefined) && '-';
+            base.isDefined(join) || (join = '-');
 
             return s.replace(new RegExp(join + '(\\w)', 'g'), function(m, p1) {
                 return p1.toUpperCase();
@@ -717,7 +573,7 @@
             if (!this.isString(s))
                 return '';
 
-            join = (join === undefined) && '-';
+            base.isDefined(join) || (join = '-');
 
             return s.replace(/[A-Z]/g, function(m, p1) {
                 return join + m.toLowerCase();
@@ -739,7 +595,7 @@
             if (!this.isNumber(n))
                 return '';
 
-            len = (len === undefined) && 2;
+            base.isDefined(len) || (len = 2);
 
             return n < Math.pow(10, len - 1) ? mstring.repeat('0', len - n.toString().length) + n : n.toString();
         }
@@ -786,12 +642,8 @@
                 return false;
 
             return this.each(obj1, function(v, k) {
-                if (!this.hasKey(obj2, k))
+                if (!this.hasKey(obj2, k) || !base.equals(v, obj2[k]))
                     return false;
-
-                if (!base.equals(v, obj2[k]))
-                    return false;
-
                 return true;
             });
         },
@@ -801,28 +653,26 @@
         },
 
         getKeys: function(obj) {
-            var ks = [];
-            this.each(obj, function(v, k) {
-                ks[ks.length++] = k;
+            return this.map(obj, function(v, k) {
+                return k;
             });
-            return ks;
         },
 
         getValues: function(obj) {
-            var vs = [];
-            this.each(obj, function(v) {
-                vs[vs.length++] = v;
+            return this.map(obj, function(v) {
+                return v;
             });
-            return vs;
         },
 
-        each: function(obj, fn, arg) {
+        each: function(obj, fn, arg, context) {
             if (!mfn.isFunction(fn))
                 return false;
 
+            context || (context = this);
+
             var k, v;
             for (k in obj) {
-                v = fn.call(this, obj[k], k, arg);
+                v = fn.call(context, obj[k], k, arg);
 
                 if (v === false)
                     break;
@@ -830,9 +680,11 @@
             return !!v;
         },
 
-        filter: function(obj, fn, arg) {
+        filter: function(obj, fn, arg, context) {
             if (!mfn.isFunction(fn))
                 return [];
+
+            context || (context = this);
 
             var rs = [];
             this.each(obj, function(e, k) {
@@ -841,18 +693,20 @@
                     o[k] = e;
                     rs.push(o);
                 }
-            });
+            }, null, context);
             return rs;
         },
 
-        map: function(obj, fn, arg) {
+        map: function(obj, fn, arg, context) {
             if (!mfn.isFunction(fn))
                 return [];
+
+            context || (context = this);
 
             var rs = [];
             this.each(obj, function(e, k) {
                 rs.push(fn.call(this, e, k, arg));
-            });
+            }, null, context);
             return rs;
         },
 
@@ -897,47 +751,15 @@
             if (base.isDomElement(obj) && length)
                 return true;
 
-            return mstring.isString(obj) || marray.isArray(obj) || length === 0 || typeof length === 'number' && length > 0 && (length - 1) in obj;
+            return mstring.isString(obj) || marray.isArray(obj) || length === 0 || (typeof length === 'number' && length > 0 && (length - 1) in obj);
         },
 
         isEmpty: function(arr) {
             return !arr || arr.length === 0;
         },
 
-        indexOf: function(arr, e, start) {
-            if (arr.indexOf)
-                return arr.indexOf(e, start);
-
-            start = start || 0;
-
-            var index = -1;
-            this.each(arr, function(v, i) {
-                if (v === e) {
-                    index = i;
-                    return false;
-                }
-            }, start);
-            return index;
-        },
-
-        lastIndexOf: function(arr, e, start) {
-            if (arr.lastIndexOf)
-                return arr.lastIndexOf(e, start);
-
-            start = start || arr.length - 1;
-
-            var index = -1;
-            this.reach(arr, function(v, i) {
-                if (v === e) {
-                    index = i;
-                    return false;
-                }
-            }, start);
-            return index;
-        },
-
         contains: function(arr, e, pos) {
-            return this.indexOf(arr, e, pos) > -1;
+            return arr.indexOf(e, pos) > -1;
         },
 
         repeat: function(e, count) {
@@ -978,7 +800,7 @@
 
             var s = [],
                 fn = function(a) {
-                    return isNumber ? a : String.fromCharCode(a)
+                    return isNumber ? a : String.fromCharCode(a);
                 };
 
             if (first <= second) {
@@ -999,23 +821,19 @@
             if (base.isUndefined(start) || !mnumber.isNumber(number) || number <= 0 || base.isUndefined(value))
                 return null;
 
-            var i = start,
-                l = arr.length,
-                c = 0;
-            for (; i < l; i++) {
-                if (c >= number) break;
+            var c = 0;
+            this.each(arr, function(v, i) {
+                if (c >= number) return false;
                 arr[i] = value;
                 c++;
-            }
+            }, start);
             return arr;
         },
 
         getKeys: function(arr) {
-            var ks = [];
-            this.each(arr, function(v, i) {
-                ks.push(i);
+            return this.map(arr, function(v, i) {
+                return i;
             });
-            return ks;
         },
 
         getValues: function(arr) {
@@ -1028,19 +846,22 @@
 
             var s = 0,
                 e = arr.length,
+                c = this,
                 arg, v;
 
             if (arguments.length > 2) {
                 var t = arguments[2],
                     f = arguments[3],
-                    z = arguments[4];
-                base.isDefined(t) && (mnumber.isNumber(t) && (s = t) || (arg = t));
-                base.isDefined(f) && (mnumber.isNumber(f) && (e = f) || (arg = f));
+                    z = arguments[4],
+                    x = arguments[5];
+                base.isDefined(t) && (mnumber.isNumber(t) && (s = t) || (arg = t, c = f));
+                base.isDefined(f) && (mnumber.isNumber(f) && (e = f) || (arg = f, c = z));
                 base.isDefined(z) && (arg = z);
+                base.isDefined(x) && (c = x);
             }
 
             for (; s < e; s++) {
-                v = fn.call(this, arr[s], s, arg);
+                v = fn.call(c, arr[s], s, arg);
 
                 if (v === false)
                     break;
@@ -1055,19 +876,22 @@
 
             var s = arr.length - 1,
                 e = 0,
+                c = this,
                 arg, v;
 
             if (arguments.length > 2) {
                 var t = arguments[2],
                     f = arguments[3],
-                    z = arguments[4];
-                base.isDefined(t) && (mnumber.isNumber(t) && (s = t) || (arg = t));
-                base.isDefined(f) && (mnumber.isNumber(f) && (e = f) || (arg = f));
+                    z = arguments[4],
+                    x = arguments[5];
+                base.isDefined(t) && (mnumber.isNumber(t) && (s = t) || (arg = t, c = f));
+                base.isDefined(f) && (mnumber.isNumber(f) && (e = f) || (arg = f, c = z));
                 base.isDefined(z) && (arg = z);
+                base.isDefined(x) && (c = x);
             }
 
             for (; s >= e; s--) {
-                v = fn.call(this, arr[s], s, arg);
+                v = fn.call(c, arr[s], s, arg);
 
                 if (v === false)
                     break;
@@ -1075,24 +899,28 @@
             return !!v;
         },
 
-        filter: function(arr, fn, arg) {
+        filter: function(arr, fn, arg, context) {
             if (!mfn.isFunction(fn))
                 return [];
 
+            context || (context = this);
+
             var rs = [];
             this.each(arr, function(e, i) {
-                fn.call(this, e, i, arg) && rs.push(e);
+                fn.call(context, e, i, arg) && rs.push(e);
             });
             return rs;
         },
 
-        map: function(arr, fn, arg) {
+        map: function(arr, fn, arg, context) {
             if (!mfn.isFunction(fn))
                 return [];
 
+            context || (context = this);
+
             var rs = [];
             this.each(arr, function(e, i) {
-                rs.push(fn.call(this, e, i, arg));
+                rs.push(fn.call(context, e, i, arg));
             });
             return rs;
         },
@@ -1210,8 +1038,7 @@
         },
 
         format: function(d, fmt) {
-            if (mnumber.isNumber(d))
-                d = new Date(d);
+            mnumber.isNumber(d) && (d = new Date(d));
 
             if (!this.isDate(d))
                 return '';
@@ -1227,12 +1054,10 @@
                 "q+": Math.floor((d.getMonth() + 3) / 3), //季度     
                 "S": d.getMilliseconds() //毫秒     
             };
-            if (/(y+)/.test(fmt))
-                fmt = fmt.replace(RegExp.$1, (d.getFullYear() + "").substr(4 - RegExp.$1.length));
+            /(y+)/.test(fmt) && (fmt = fmt.replace(RegExp.$1, (d.getFullYear() + "").substr(4 - RegExp.$1.length)));
 
             mobject.each(o, function(v, k) {
-                if (new RegExp("(" + k + ")").test(fmt))
-                    fmt = fmt.replace(RegExp.$1, RegExp.$1.length === 1 ? v : ("00" + v).substr(("" + v).length));
+                new RegExp("(" + k + ")").test(fmt) && (fmt = fmt.replace(RegExp.$1, RegExp.$1.length === 1 ? v : ("00" + v).substr(("" + v).length)));
             });
             return fmt;
         }
@@ -1266,7 +1091,7 @@
             if (!mobject.isPlainObject(obj))
                 return '';
 
-            join = join || '&';
+            join || (join = '&');
 
             var s = '';
             mobject.each(obj, function(v, k) {
@@ -1281,7 +1106,7 @@
             if (!mstring.isString(url))
                 return null;
 
-            split = split || '&';
+            split || (split = '&');
 
             var arr = url.split(split),
                 a, obj = {};
@@ -1353,42 +1178,30 @@
     ///针对颜色的一些操作方法
     var mcolor = {
         create: function(r, g, b, f, a) {
-            if (mstring.isString(r))
-                r = parseInt(r, 16);
-
-            if (mstring.isString(g))
-                g = parseInt(g, 16);
-
-            if (mstring.isString(b))
-                b = parseInt(b, 16);
-
-            return f ? (a !== undefined ? 'RGBA(' + r + ',' + g + ',' + b + ',' + a + ')' : 'RGB(' + r + ',' + g + ',' + b + ')') : ('#' + r.toString(16) + g.toString(16) + b.toString(16));
+            mstring.isString(r) && (r = parseInt(r, 16));
+            mstring.isString(g) && (g = parseInt(g, 16));
+            mstring.isString(b) && (b = parseInt(b, 16));
+            return f ? (base.isDefined(a) ? 'RGBA(' + r + ',' + g + ',' + b + ',' + a + ')' : 'RGB(' + r + ',' + g + ',' + b + ')') : ('#' + r.toString(16) + g.toString(16) + b.toString(16));
         },
 
         getRed: function(c) {
             if (!c) return;
 
-            if (!regRgb.test(c))
-                c = this.toRGB(c);
-
+            regRgb.test(c) || (c = this.toRGB(c));
             return parseInt(c.replace(regRep, '').split(',')[0]);
         },
 
         getGreen: function(c) {
             if (!c) return;
 
-            if (!regRgb.test(c))
-                c = this.toRGB(c);
-
+            regRgb.test(c) || (c = this.toRGB(c));
             return parseInt(c.replace(regRep, '').split(',')[1]);
         },
 
         getBlue: function(c) {
             if (!c) return;
 
-            if (!regRgb.test(c))
-                c = this.toRGB(c);
-
+            regRgb.test(c) || (c = this.toRGB(c));
             return parseInt(c.replace(regRep, '').split(',')[2]);
         },
 
@@ -1407,8 +1220,7 @@
 
                 while (i < 3) {
                     h = Number(cs[i]).toString(16);
-                    if (h.length === 1)
-                        h = '0' + h;
+                    h.length === 1 && (h = '0' + h);
                     sh += h;
                     i++;
                 }
@@ -1460,15 +1272,12 @@
                     i += 2;
                 }
 
-                if (a !== undefined)
-                    cs.push(a);
+                base.isDefined(a) && (cs.push(a));
 
-                return (a === undefined ? 'RGB' : 'RBGA') + '(' + cs.join(',') + ')';
+                return (base.isUndefined(a) && 'RGB' || 'RBGA') + '(' + cs.join(',') + ')';
             }
 
-            if (a !== undefined)
-                c = c.replace(/rgb/i, 'RGBA').replace(')', ',' + a + ')'); //补上Alpha通道，0-1
-
+            base.isDefined(a) && (c = c.replace(/rgb/i, 'RGBA').replace(')', ',' + a + ')')); //补上Alpha通道，0-1
             return c;
         }
     };
@@ -1609,38 +1418,69 @@
     ///针对DOM事件的一些方法
     var devent = {
         on: function(tg, ty, fn, arg) {
-            var guid = requestNewEvent(tg, ty, fn);
-            if (!guid) return;
+            function add(tg, ty, fn, arg) {
+                var guid = requestNewEvent(tg, ty, fn);
+                if (!guid) return;
 
-            var handler = function(e) {
-                var callee = arguments.callee;
-                callee.fn.call(this, e, callee.arg); //将event对象作为参数传递给处理函数
+                var handler = function(e) {
+                    var callee = arguments.callee;
+                    callee.fn.call(this, e, callee.arg); //将event对象作为参数传递给处理函数
+                }
+                handler.fn = fn;
+                handler.arg = arg;
+                eventHandlers[guid][ty].push(handler);
+                tg.addEventListener(ty, handler, false);
             }
-            handler.fn = fn;
-            handler.arg = arg;
-            eventHandlers[guid][ty].push(handler);
-            tg.addEventListener(ty, handler, false);
+
+            if (mobject.isPlainObject(ty)) {
+                arg = fn;
+                mobject.each(ty, function(fn, k) {
+                    add(tg, k, fn, arg);
+                });
+                return;
+            }
+            add(tg, ty, fn, arg);
         },
 
         off: function(tg, ty, fn) {
-            var handlers = this.handlers(tg, ty);
-            marray.each(handlers, function(v, i) {
-                if (v.fn === fn) {
-                    tg.removeEventListener(ty, v, false);
-                    handlers.splice(i, 1);
-                    delete v.fn;
-                    delete v.arg;
-                    return false;
-                }
-            });
+            function remove(tg, ty, fn) {
+                var handlers = this.handlers(tg, ty);
+                marray.each(handlers, function(v, i) {
+                    if (v.fn === fn) {
+                        tg.removeEventListener(ty, v, false);
+                        handlers.splice(i, 1);
+                        delete v.fn;
+                        delete v.arg;
+                        return false;
+                    }
+                });
+            }
+
+            if (mobject.isPlainObject(ty)) {
+                mobject.each(ty, function(fn, k) {
+                    remove.call(this, tg, k, fn);
+                }, null, this);
+                return;
+            }
+            remove.call(this, tg, ty, fn);
         },
 
         once: function(tg, ty, fn, arg) {
-            var that = this;
-            this.on(tg, ty, function(e) {
-                that.off(tg, ty, arguments.callee);
-                fn.call(this, e, arg);
-            });
+            function _once(tg, ty, fn, arg, context) {
+                context.on(tg, ty, function(e) {
+                    context.off(e.target, e.type, arguments.callee);
+                    fn.call(this, e, arg);
+                });
+            }
+
+            if (mobject.isPlainObject(ty)) {
+                arg = fn;
+                mobject.each(ty, function(fn, k) {
+                    _once(tg, k, fn, arg, this);
+                }, null, this);
+                return;
+            }
+            _once(tg, ty, fn, arg, this);
         },
 
         listened: function(tg, ty) {
@@ -1674,7 +1514,7 @@
         },
 
         trigger: function(tg, ty, data, scope) {
-            var ismouse = marray.indexOf(mouseEventTypes, ty) > -1;
+            var ismouse = mouseEventTypes.indexOf(ty) > -1;
             try {
                 var e = document.createEvent(ismouse ? 'MouseEvents' : 'HTMLEvents');
                 data && (e.data = data);
@@ -1688,28 +1528,67 @@
     ///针对自定义事件的一些方法
     var cevent = {
         on: function(tg, ty, fn, arg) {
-            var guid = requestNewEvent(tg, ty, fn);
-            if (!guid) return;
+            function add(tg, ty, fn, arg) {
+                var guid = requestNewEvent(tg, ty, fn);
+                if (!guid) return;
 
-            var handler = function(tg, ty, data) {
-                var callee = arguments.callee;
-                callee.fn.call(this, new CustomEvent(tg, ty, data), callee.arg); //将event对象作为参数传递给处理函数
+                var handler = function(tg, ty, data) {
+                    var callee = arguments.callee;
+                    callee.fn.call(this, new CustomEvent(tg, ty, data), callee.arg); //将event对象作为参数传递给处理函数
+                }
+                handler.fn = fn;
+                handler.arg = arg;
+                eventHandlers[guid][ty].push(handler);
             }
-            handler.fn = fn;
-            handler.arg = arg;
-            eventHandlers[guid][ty].push(handler);
+
+            if (mobject.isPlainObject(ty)) {
+                arg = fn;
+                mobject.each(ty, function(fn, k) {
+                    add(tg, k, fn, arg);
+                });
+                return;
+            }
+            add(tg, ty, fn, arg);
         },
 
         off: function(tg, ty, fn) {
-            var handlers = this.handlers(tg, ty);
-            marray.each(handlers, function(v, i) {
-                if (v.fn === fn) {
-                    handlers.splice(i, 1);
-                    delete v.fn;
-                    delete v.arg;
-                    return false;
-                }
-            });
+            function remove(tg, ty, fn) {
+                var handlers = this.handlers(tg, ty);
+                marray.each(handlers, function(v, i) {
+                    if (v.fn === fn) {
+                        handlers.splice(i, 1);
+                        delete v.fn;
+                        delete v.arg;
+                        return false;
+                    }
+                });
+            }
+
+            if (mobject.isPlainObject(ty)) {
+                mobject.each(ty, function(fn, k) {
+                    remove.call(this, tg, k, fn);
+                }, null, this);
+                return;
+            }
+            remove.call(this, tg, ty, fn);
+        },
+
+        once: function(tg, ty, fn, arg) {
+            function _once(tg, ty, fn, arg, context) {
+                context.on(tg, ty, function(e) {
+                    context.off(e.target, e.type, arguments.callee);
+                    fn.call(this, e, arg);
+                });
+            }
+
+            if (mobject.isPlainObject(ty)) {
+                arg = fn;
+                mobject.each(ty, function(fn, k) {
+                    _once(tg, k, fn, arg, this);
+                }, null, this);
+                return;
+            }
+            _once(tg, ty, fn, arg, this);
         },
 
         listened: function(tg, ty) {
@@ -1770,6 +1649,10 @@
 
         off: function(ty, fn) {
             cevent.off(this, ty, fn);
+        },
+
+        once: function(ty, fn, arg) {
+            cevent.once(this, ty, fn, arg);
         },
 
         listened: function(ty) {
@@ -2149,26 +2032,16 @@
 
                 if (cookieStart > -1) {
                     var cookieEnd = document.cookie.indexOf(';', cookieStart);
-                    if (cookieEnd === -1)
-                        cookieEnd = document.cookie.length;
-
+                    cookieEnd === -1 && (cookieEnd = document.cookie.length);
                     cookieValue = decodeURIComponent(document.cookie.substring(cookieStart + cookieName.length, cookieEnd));
                 }
                 return cookieValue;
             } else { //设置
                 var cookieText = encodeURIComponent(name) + '=' + encodeURIComponent(value);
-                if (expires instanceof Date)
-                    cookieText += ';expires=' + expires.toGMTString();
-
-                if (path)
-                    cookieText += ';path=' + path;
-
-                if (domain)
-                    cookieText += ';domain=' + domain;
-
-                if (secure)
-                    cookieText += ';secure';
-
+                expires instanceof Date && (cookieText += ';expires=' + expires.toGMTString());
+                path && (cookieText += ';path=' + path);
+                domain && (cookieText += ';domain=' + domain);
+                secure && (cookieText += ';secure');
                 document.cookie = cookieText;
             }
         },
@@ -2317,11 +2190,9 @@
 
         ///检索所有元素
         elements: function() {
-            var eles = [];
-            this.each(function() {
-                eles[eles.length++] = this;
+            return marray.map(this, function(v) {
+                return v;
             });
-            return eles;
         },
 
         ///添加新元素到DOM元素集合中
@@ -2364,6 +2235,10 @@
             return new _M_(this[this.length - 1]);
         },
 
+        nth: function(eq) {
+            return new _M_(this.get(eq - 1)); //start from index 1
+        },
+
         ///判断DOM元素集合中是否包含目标元素
         has: function(target) {
             return this.index(target) > -1;
@@ -2380,10 +2255,9 @@
                 if (isS || isM || isE) {
                     this.each(function() {
                         if (isS) {
-                            var _ = this;
-                            marray.each(base.query(selector, this.parentNode), function(v) {
-                                if (v === _) {
-                                    cc.push(_);
+                            marray.each.call(this, base.query(selector, this.parentNode), function(v) {
+                                if (v === this) {
+                                    cc.push(this);
                                     return false;
                                 }
                             });
@@ -2474,7 +2348,7 @@
             this.each(function() {
                 var f = new _M_(this).parent();
                 selector && (f = f.filter(selector));
-                !marray.contains(cc, f[0]) && cc.push(f[0]);
+                marray.contains(cc, f[0]) || cc.push(f[0]);
             });
             return new _M_(cc);
         },
@@ -2588,67 +2462,40 @@
             return this;
         },
 
+        ///对DOM中各元素执行替换操作，替换为指定的目标元素
         replace: function(target) {
-            ///<summary>
-            ///对DOM中各元素执行替换操作，替换为指定的目标元素
-            ///&#10;返回对所有被替换元素的一个My对象包装
-            ///</summary>
-            ///<param name="target" type="Element|My">目标元素，可以是元素对象，也可以是一个My对象</param>
-            ///<returns type="My"/>
-
+            var cc = [];
             if (target) {
-                var cc = [];
-                var isE = base.isDomElement(target),
-                    isM = base.isMy(target);
-
-                if (isE || isM) {
+                base.isDomElement(target) && (target = My(target));
+                if (base.isMy(target)) {
                     this.each(function(i) {
-                        if (isE) {
-                            //第一个之后，则复制一份，保证不是一个DOM引用
-                            var f = this.parentNode.replaceChild(i === 0 ? target : target.cloneNode(true), this);
-                            if (f)
-                                cc.push(f);
-                        } else { //_M实例，将该实例的DOM树所有元素均按原序插入到后面
-                            var $ = i === 0 ? target : target.clone(true), //第一个之后，则复制一份，保证不是一个DOM引用
-                                $f;
-                            for (i = $.length - 1; i >= 0; i--) {
-                                $f = this.parentNode.replaceChild($[i], this);
-                                if ($f)
-                                    cc.push($f);
-                            }
-                        }
+                        var $ = i && target.clone(true) || target,
+                            _ = this;
+                        $.reach(function() {
+                            var f = _.parentNode.replaceChild(this, _);
+                            f && cc.push(f);
+                        });
                     });
                 }
-                return new _M_(cc);
             }
+            return new _M_(cc);
         },
 
+        ///对DOM中各元素执行删除操作
         remove: function(selector) {
-            ///<summary>
-            ///对DOM中各元素执行删除操作
-            ///&#10;返回对所有被删除元素的一个My对象包装
-            ///</summary>
-            ///<param name="selector" type="String" optional="true">查询选择符，用来决定删除该选择符指定的元素，若无该参数，则删除所有元素</param>
-            ///<returns type="My"/>
-
             var cc = [];
-            if (selector)
-                selector = mstring.trim(selector);
-
             this.each(function() {
                 var p = this.parentNode;
                 if (p) {
                     var f;
                     if (!selector) {
                         f = p.removeChild(this);
-                        if (f)
-                            cc.push(f);
+                        f && cc.push(f);
                     } else {
                         var $ = new _M_(p).children(selector);
                         if ($.has(this)) {
                             f = p.removeChild(this);
-                            if (f)
-                                cc.push(f);
+                            f && cc.push(f);
                         }
                     }
                 }
@@ -2657,130 +2504,98 @@
         },
 
         prev: function(selector) {
-            ///<summary>
-            ///检索DOM中各元素的上一个兄弟节点
-            ///&#10;返回对匹配结果的一个My对象包装
-            ///</summary>
-            ///<param name="selector" type="String" optional="true">查询选择符，用来决定只匹配符合该选择符的元素，若无该参数，则匹配所有元素</param>
-            ///<returns type="My"/>
-
             var cc = [];
-            if (selector)
-                selector = mstring.trim(selector);
-
             this.each(function() {
-                var p = getPreviousSibling(this);
-                if (p) {
-                    if (!selector)
-                        cc.push(p);
-                    else {
-                        var $ = new _M_(p.parentNode).children(selector);
-                        if ($.has(p))
-                            cc.push(p);
-                    }
+                if (!selector) {
+                    var p = getPreviousSibling(this);
+                    p && cc.push(p);
+                    return false;
+                }
+
+                var $ = new _M_(this.parentNode).children(selector);
+                if ($.length) {
+                    var p = this;
+                    do {
+                        p = getPreviousSibling(p);
+                    } while (p && !$.has(p));
+                    p && cc.push(p);
                 }
             });
             return new _M_(cc);
         },
 
         prevAll: function(selector) {
-            ///<summary>
-            ///检索DOM中各元素的所有上游兄弟节点
-            ///&#10;返回对所有被匹配结果的一个My对象包装
-            ///</summary>
-            ///<param name="selector" type="String" optional="true">查询选择符，用来决定只匹配符合该选择符的元素，若无该参数，则匹配所有元素</param>
-            ///<returns type="My"/>
-
             var cc = [];
-            if (selector)
-                selector = mstring.trim(selector);
-
             this.each(function() {
-                var p = getPreviousSibling(this);
-                if (p) {
-                    var $ = new _M_(p.parentNode).children(selector); //因为所有兄弟节点都拥有共同的父节点，所以只需取得一次就可以了
-                    while (p) {
-                        if (!selector) {
-                            if (marray.indexOf(cc, p) === -1)
-                                cc.push(p);
-                        } else {
-                            if ($.has(p) && marray.indexOf(cc, p) === -1)
-                                cc.push(p);
-                        }
+                if (!selector) {
+                    var p = this;
+                    do {
                         p = getPreviousSibling(p);
-                    }
+                        p && cc.indexOf(p) === -1 && cc.push(p);
+                    } while (p);
+                    return false;
+                }
+
+                var $ = new _M_(this.parentNode).children(selector); //因为所有兄弟节点都拥有共同的父节点，所以只需取得一次就可以了
+                if ($.length) {
+                    var p = this;
+                    do {
+                        p = getPreviousSibling(p);
+                        p && $.has(p) && cc.indexOf(p) === -1 && cc.push(p);
+                    } while (p);
                 }
             });
             return new _M_(cc);
         },
 
         next: function(selector) {
-            ///<summary>
-            ///检索DOM中各元素的下一个兄弟节点
-            ///&#10;返回对匹配结果的一个My对象包装
-            ///</summary>
-            ///<param name="selector" type="String" optional="true">查询选择符，用来决定只匹配符合该选择符的元素，若无该参数，则匹配所有元素</param>
-            ///<returns type="My"/>
-
             var cc = [];
-            if (selector)
-                selector = mstring.trim(selector);
-
             this.each(function() {
-                var n = getNextSibling(this);
-                if (n) {
-                    if (!selector)
-                        cc.push(n);
-                    else {
-                        var $ = new _M_(n.parentNode).children(selector);
-                        if ($.has(n))
-                            cc.push(n);
-                    }
+                if (!selector) {
+                    var n = getNextSibling(this);
+                    n && cc.push(n);
+                    return false;
+                }
+
+                var $ = new _M_(this.parentNode).children(selector);
+                if ($.length) {
+                    var n = this;
+                    do {
+                        n = getNextSibling(n);
+                    } while (n && !$.has(n));
+                    n && cc.push(n);
                 }
             });
             return new _M_(cc);
         },
 
         nextAll: function(selector) {
-            ///<summary>
-            ///检索DOM中各元素的所有下游兄弟节点
-            ///&#10;返回对所有被匹配结果的一个My对象包装
-            ///</summary>
-            ///<param name="selector" type="String" optional="true">查询选择符，用来决定只匹配符合该选择符的元素，若无该参数，则匹配所有元素</param>
-            ///<returns type="My"/>
-
             var cc = [];
-            if (selector)
-                selector = mstring.trim(selector);
-
             this.each(function() {
-                var n = getNextSibling(this);
-                if (n) {
-                    var $ = new _M_(n.parentNode).children(selector); //因为所有兄弟节点都拥有共同的父节点，所以只需取得一次就可以了
-                    while (n) {
-                        if (!selector) {
-                            if (marray.indexOf(cc, n) === -1)
-                                cc.push(n);
-                        } else {
-                            if ($.has(n) && marray.indexOf(cc, n) === -1)
-                                cc.push(n);
-                        }
+                if (!selector) {
+                    var n = this;
+                    do {
                         n = getNextSibling(n);
-                    }
+                        n && cc.indexOf(n) === -1 && cc.push(n);
+                    } while (n);
+                    return false;
+                }
+
+                var $ = new _M_(this.parentNode).children(selector); //因为所有兄弟节点都拥有共同的父节点，所以只需取得一次就可以了
+                if ($.length) {
+                    var n = this;
+                    do {
+                        n = getNextSibling(n);
+                        n && $.has(n) && cc.indexOf(n) === -1 && cc.push(n);
+                    } while (n);
                 }
             });
             return new _M_(cc);
         },
 
         clone: function(isdepth) {
-            ///<summary>
-            ///复制My对象，新的My对象包含了原My对象的所有DOM元素的副本
-            ///</summary>
-            ///<param name="isdepth" type="Boolean" optional="true">决定是否深复制包括所有属性和子节点，默认为false，不深复制</param>
-            ///<returns type="My"/>
-
             var cc = [];
-            isdepth = isdepth || false;
+            base.isDefined(isdepth) || isdepth = false;
             this.each(function() {
                 cc.push(this.cloneNode(isdepth));
             });
@@ -2801,7 +2616,7 @@
             if (v === undefined) { //检索
                 var e = this[0];
                 if (e) {
-                    if (marray.indexOf(es, e.tagName) != -1) { //是表单元素
+                    if (es.indexOf(e.tagName) != -1) { //是表单元素
                         if (e.tagName === es[2] && e.multiple) { //多选列表
                             var r = [];
                             for (var k = 0, l = e.length, opt; k < l; k++) {
@@ -2817,17 +2632,17 @@
             } else { //设置
                 var cc = [];
                 this.each(function() {
-                    if (marray.indexOf(es, this.tagName) != -1) {
+                    if (es.indexOf(this.tagName) != -1) {
                         if (marray.isArray(v)) { //是一组
                             if (this.tagName = es[0] && (this.type === 'radio' || this.type === 'checkbox')) { //单选框或复选框
-                                if (marray.indexOf(v, this.value) === -1)
+                                if (v.indexOf(this.value) === -1)
                                     this.checked = 'false';
                                 else
                                     this.checked = 'true';
                             } else if (this.tagName === es[2] && this.multiple) { //多选列表
                                 for (var j = 0, l = this.length, opt; j < l; j++) {
                                     opt = this.options[j];
-                                    if (marray.indexOf(v, opt.text) === -1)
+                                    if (v.indexOf(opt.text) === -1)
                                         opt.selected = 'false';
                                     else
                                         opt.selected = 'true';
@@ -3585,7 +3400,7 @@
                             c, j;
                         for (; i < l; i++) {
                             c = cls[i];
-                            j = marray.indexOf(cs, c);
+                            j = cs.indexOf(c);
                             if (j > -1)
                                 cs.splice(j, 1);
                         }
@@ -4325,10 +4140,9 @@
         name: 'My',
         version: '1.0.0',
         isReady: false,
-        client: mclient,
         eventType: eventType,
         dataType: dataType,
-        //contentType: contentType,
+        contentType: contentType,
         errorCode: errorCode
     }, mnumber, mdate, mcookie, mhtml, murl);
 
