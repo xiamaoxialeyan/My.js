@@ -2595,172 +2595,117 @@
 
         clone: function(isdepth) {
             var cc = [];
-            base.isDefined(isdepth) || isdepth = false;
+            base.isDefined(isdepth) || (isdepth = false);
             this.each(function() {
                 cc.push(this.cloneNode(isdepth));
             });
             return new _M_(cc);
         },
 
-        val: function(v) {
-            ///<summary>
-            ///设置或检索DOM中表单元素(input/textarea/select等)的value值
-            ///&#10;当有参数，为设置所有表单元素的value值，否则为获取第一个表单元素的value值
-            ///&#10;当是设置行为，返回对所有表单元素的My对象包装
-            ///&#10;当是检索行为，返回第一个表单元素的value值，若select=multiple(多选列表)，返回的将是多个选择值的数组，若无选择项，返回长度为0的空数组
-            ///</summary>
-            ///<param name="v" type="String|Array" optional="true">设置给表单元素的value值，可以是一个value值数组，表示对radio/checkbox/select=multiple这样的元素设置选中与否、选中项</param>
-            ///<returns type="My|String|Array"/>
-
-            var es = ['INPUT', 'TEXTAREA', 'SELECT', 'OPTION'];
-            if (v === undefined) { //检索
-                var e = this[0];
-                if (e) {
-                    if (es.indexOf(e.tagName) != -1) { //是表单元素
-                        if (e.tagName === es[2] && e.multiple) { //多选列表
-                            var r = [];
-                            for (var k = 0, l = e.length, opt; k < l; k++) {
-                                opt = e.options[k];
-                                if (opt.selected)
-                                    r.push(opt.text);
-                            }
-                            return r;
-                        }
-                        return e.value;
-                    }
-                }
-            } else { //设置
-                var cc = [];
-                this.each(function() {
-                    if (es.indexOf(this.tagName) != -1) {
-                        if (marray.isArray(v)) { //是一组
-                            if (this.tagName = es[0] && (this.type === 'radio' || this.type === 'checkbox')) { //单选框或复选框
-                                if (v.indexOf(this.value) === -1)
-                                    this.checked = 'false';
-                                else
-                                    this.checked = 'true';
-                            } else if (this.tagName === es[2] && this.multiple) { //多选列表
-                                for (var j = 0, l = this.length, opt; j < l; j++) {
-                                    opt = this.options[j];
-                                    if (v.indexOf(opt.text) === -1)
-                                        opt.selected = 'false';
-                                    else
-                                        opt.selected = 'true';
-                                }
-                            } else this.value = v[0];
-                        } else this.value = v;
-                        cc.push(this);
-                    }
-                });
-                return new _M_(cc);
-            }
-        },
-
         html: function(h) {
-            ///<summary>
-            ///设置或检索DOM中元素的innerHTML内容
-            ///&#10;当有参数，为设置DOM中全部元素的innerHTML内容，否则为获取第一个元素的innerHTML内容
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素的innerHTML内容
-            ///</summary>
-            ///<param name="h" type="String|Template" optional="true">设置给元素的innerHTML内容</param>
-            ///<returns type="My|String"/>
-
-            if (h === undefined) { //检索
+            if (h === undefined) {
                 var e = this[0];
-                if (e)
-                    return e.innerHTML;
-            } else { //设置
-                if (h instanceof base.Template)
-                    h = h.execute();
-                this.each(function() {
-                    if (this.innerHTML !== undefined) this.innerHTML = h;
-                });
-                return this;
+                return e && e.innerHTML || '';
             }
+
+            h instanceof base.Template && (h = h.execute());
+            this.each(function() {
+                base.isDefined(this.innerHTML) && (this.innerHTML = h);
+            });
+            return this;
         },
 
         text: function(txt) {
-            ///<summary>
-            ///设置或检索DOM中元素的文本内容(textContent)
-            ///&#10;当有参数，为设置DOM中全部元素的文本内容，否则为获取第一个元素的文本内容
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素的文本内容
-            ///</summary>
-            ///<param name="txt" type="String" optional="true">设置给元素的文本内容</param>
-            ///<returns type="My|String"/>
-
             if (txt === undefined) { //检索
                 var e = this[0];
-                if (e)
-                    return e.textContent;
-            } else { //设置
-                this.each(function() {
-                    if (this.textContent !== undefined) this.textContent = txt;
-                });
-                return this;
+                return e && e.textContent || '';
             }
+
+            this.each(function() {
+                base.isDefined(this.textContent) && (this.textContent = txt);
+            });
+            return this;
         },
 
-        attr: function(name, value) {
-            ///<summary>
-            ///设置或检索DOM中元素的属性值
-            ///&#10;当有第二个参数，为各元素设置指定属性的值，否则为获取第一个元素指定属性的值
-            ///&#10;此方法有修正checked/selected/disabled/required/readonly这样的属性，不论设置true或checked/selected/disabled/enabled/required/readonly都可以生效，false或''同理，当是检索行为，只会返回true或false
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素指定属性的值
-            ///</summary>
-            ///<param name="name" type="String|Object">
-            ///&#10;属性名
-            ///&#10;当此参数是一个属性名/属性值对的字面量对象，则表示批量设置属性值，将忽略第二个参数
-            ///</param>
-            ///<param name="value" type="String|Number|Boolean" optional="true">设置给指定属性的值</param>
-            ///<returns type="My|String"/>
-
-            if (mstring.isString(name) && !mstring.isEmpty(name)) {
-                var isPro = name === 'checked' || name === 'selected' || name === 'disabled' || name === 'enabled' || name === 'required' || name === 'readonly';
-                if (value === undefined) { //检索
-                    var e = this[0];
-                    if (e) {
-                        if (isPro) {
-                            if (name === 'enabled')
-                                return !e['disabled'];
-                            return e[name];
+        /*
+         *设置或检索DOM表单元素(input/textarea/select等)的value值
+         *若select=multiple(多选列表)，返回的将是多个选择值的数组，若无选择项，返回长度为0的空数组
+         *参数：设置给表单元素的value值，可以是一个value值数组，表示对radio/checkbox/select=multiple这样的元素设置选中与否、选中项
+         */
+        val: function(v) {
+            var es = ['INPUT', 'TEXTAREA', 'SELECT', 'OPTION'];
+            if (v === undefined) { //检索
+                var e = this[0];
+                if (e && es.indexOf(e.tagName) != -1) { //是表单元素
+                    if (e.tagName === es[2] && e.multiple) { //多选列表
+                        var r = [];
+                        for (var k = 0, l = e.length, opt; k < l; k++) {
+                            opt = e.options[k];
+                            opt.selected && r.push(opt.text);
                         }
-                        return e.getAttribute(supportSetAttr ? name : (IEfix[name] || name));
+                        return r;
                     }
-                } else { //设置
-                    if (mstring.isString(value) || mnumber.isNumber(value) || typeof value === 'boolean') {
-                        this.each(function() {
-                            if (isPro) {
-                                if (typeof value === 'boolean' || value === name || value === '') {
-                                    if (name === 'enabled') {
-                                        name = 'disabled';
-                                        value = !value;
-                                    }
-                                    value ? this.setAttribute(name, name) : this.removeAttribute(name);
-                                }
-                            } else {
-                                this.setAttribute(supportSetAttr ? name : (IEfix[name] || name), value);
-                            }
-                        });
-                    }
-                    return this;
+                    return e.value;
                 }
+                return;
+            }
+
+            var cc = [];
+            this.each(function() {
+                if (es.indexOf(this.tagName) != -1) {
+                    if (marray.isArray(v)) { //是一组
+                        if (this.tagName = es[0] && (this.type === 'radio' || this.type === 'checkbox')) { //单选框或复选框
+                            this.checked = v.indexOf(this.value) > -1;
+                        } else if (this.tagName === es[2] && this.multiple) { //多选列表
+                            for (var j = 0, l = this.length, opt; j < l; j++) {
+                                opt = this.options[j];
+                                opt.selected = v.indexOf(opt.text) > -1;
+                            }
+                        } else this.value = v[0];
+                    } else this.value = v;
+                    cc.push(this);
+                }
+            });
+            return new _M_(cc);
+        },
+
+        /*
+         *设置或检索DOM元素的属性值
+         *此方法有修正checked/selected/disabled/required/readonly这样的属性，不论设置true或checked/selected/disabled/enabled/required/readonly都可以生效，false或''同理，当是检索行为，只会返回true或false
+         */
+        attr: function(name, value) {
+            if (mstring.isString(name) && !mstring.isEmpty(name)) {
+                var isPro = ['checked', 'selected', 'disabled', 'enabled', 'required', 'readonly'].indexOf(name) > -1;
+
+                if (value === undefined) {
+                    var e = this[0];
+                    if (e) return isPro ? (name === 'enabled' ? !e['disabled'] : e[name]) : e.getAttribute(supportSetAttr ? name : (IEfix[name] || name));
+                    return;
+                }
+
+                if (mstring.isString(value) || mnumber.isNumber(value) || typeof value === 'boolean') {
+                    this.each(function() {
+                        if (isPro) {
+                            if (typeof value === 'boolean' || value === name || value === '') {
+                                if (name === 'enabled') {
+                                    name = 'disabled';
+                                    value = !value;
+                                }
+                                value ? this.setAttribute(name, name) : this.removeAttribute(name);
+                            }
+                        } else {
+                            this.setAttribute(supportSetAttr ? name : (IEfix[name] || name), value);
+                        }
+                    });
+                }
+                return this;
             } else if (mobject.isPlainObject(name)) {
-                for (var k in name)
-                    this.attr(k, name[k]);
+                for (var k in name) this.attr(k, name[k]);
                 return this;
             }
         },
 
         removeAttr: function(name) {
-            ///<summary>
-            ///DOM树中各元素执行删除指定属性的操作
-            ///</summary>
-            ///<param name="name" type="String">属性名</param>
-            ///<returns type="My"/>
-
             if (mstring.isString(name) && !mstring.isEmpty(name)) {
                 this.each(function() {
                     this.removeAttribute(supportSetAttr ? name : (IEfix[name] || name));
@@ -2769,19 +2714,9 @@
             return this;
         },
 
+        ///设置或检索DOM元素的宽度(是内容区域宽度，不包括左右内外边距、左右边框)
+        ///参数：可以是数值(被当作是像素单位)也可以是字符串(如在css中设置，100px/2em/50%/auto等，若无单位，API会自动加上像素单位)
         width: function(w) {
-            ///<summary>
-            ///设置或检索DOM树中元素的宽度(是内容区域宽度，不包括左右内外边距、左右边框)
-            ///&#10;当有参数，为各元素设置指定值的宽度，否则为获取第一个元素的宽度
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素的宽度
-            ///</summary>
-            ///<param name="w" type="Number|String" optional="true">
-            ///宽度值
-            ///&#10;可以是数值(被当作是像素单位)也可以是字符串(如在css中设置，100px/2em/50%/auto等，若无单位，API会自动加上像素单位)
-            ///</param>
-            ///<returns type="My|Number"/>
-
             if (w === undefined) {
                 var $ = this.first(),
                     e = $[0];
@@ -2800,33 +2735,20 @@
 
                     var box = $.style('box-sizing');
                     if (box === 'border-box') { //边框盒子，减掉左右外边距
-                        var ml = Math.round(parseFloat($.style('margin-left'))) || 0,
-                            mr = Math.round(parseFloat($.style('margin-right'))) || 0;
-                        ww = ww - (ml + mr);
+                        ww -= Math.round(parseFloat($.style('margin-left'))) || 0;
+                        ww -= Math.round(parseFloat($.style('margin-right'))) || 0;
                     }
                     return ww > 0 ? ww : 0;
                 }
-            } else {
-                var rw = addPxUnit(w);
-                if (rw)
-                    this.style('width', rw);
-                return this;
+                return;
             }
+
+            var rw = addPxUnit(w);
+            rw && this.style('width', rw);
+            return this;
         },
 
         height: function(h) {
-            ///<summary>
-            ///设置或检索DOM树中元素的高度(是内容区域高度，不包括上下内外边距、上下边框)
-            ///&#10;当有参数，为各元素设置指定值的高度，否则为获取第一个元素的高度
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素的高度
-            ///</summary>
-            ///<param name="h" type="Number|String" optional="true">
-            ///高度值
-            ///&#10;可以是数值(被当作是像素单位)也可以是字符串(如在css中设置，100px/2em/50%/auto等，若无单位，API会自动加上像素单位)
-            ///</param>
-            ///<returns type="My|Number"/>
-
             if (h === undefined) {
                 var $ = this.first(),
                     e = this[0];
@@ -2845,49 +2767,35 @@
 
                     var box = this.style('box-sizing');
                     if (box === 'border-box') { //边框盒子，减掉上下外边距
-                        var mt = Math.round(parseFloat(this.style('margin-top'))) || 0,
-                            mb = Math.round(parseFloat(this.style('margin-bottom'))) || 0;
-                        hh = hh - (mt + mb);
+                        hh -= Math.round(parseFloat($.style('margin-top'))) || 0;
+                        hh -= Math.round(parseFloat($.style('margin-bottom'))) || 0;
                     }
                     return hh > 0 ? hh : 0;
                 }
-            } else {
-                var rh = addPxUnit(h);
-                if (rh) this.style(' height', rh);
-                return this;
+                return;
             }
+
+            var rh = addPxUnit(h);
+            rh && this.style(' height', rh);
+            return this;
         },
 
+        ///设置或检索DOM元素的大小(即width和height)
         size: function(s) {
-            ///<summary>
-            ///设置或检索DOM树中元素的大小(即width和height)
-            ///&#10;当有参数，为各元素设置大小，否则为获取第一个元素的大小
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素大小
-            ///</summary>
-            ///<param name="s" type="Object" optional="true">
-            ///大小，结构如{width:*,height:*}，width和height参数说明请看width()和height()方法
-            ///</param>
-            ///<returns type="My|Object"/>
-
             if (s === undefined) {
                 return {
                     width: this.width(),
                     height: this.height()
                 };
-            } else {
-                this.width(s.width);
-                this.height(s.height);
-                return this;
             }
+
+            this.width(s.width);
+            this.height(s.height);
+            return this;
         },
 
+        ///检索DOM元素的内宽度(内容区域宽度+左右内边距)，不包括左右外边距和左右边框
         innerWidth: function() {
-            ///<summary>
-            ///检索DOM树中第一个元素的内宽度(内容区域宽度+左右内边距)，不包括左右边框
-            ///</summary>
-            ///<returns type="Number"/>
-
             var $ = this.first(),
                 e = this[0];
             if (e) {
@@ -2898,9 +2806,8 @@
                 var box = $.style('box-sizing');
 
                 if (box === 'border-box') { //边框盒子，减掉左右外边距
-                    var ml = Math.round(parseFloat($.style('margin-left'))) || 0,
-                        mr = Math.round(parseFloat($.style('margin-right'))) || 0;
-                    ww = ww - (ml + mr);
+                    ww -= Math.round(parseFloat($.style('margin-left'))) || 0;
+                    ww -= Math.round(parseFloat($.style('margin-right'))) || 0;
                 }
                 //减掉左右边框
                 ww -= Math.round(parseFloat($.style('border-left-width'))) || 0;
@@ -2910,11 +2817,6 @@
         },
 
         innerHeight: function() {
-            ///<summary>
-            ///检索DOM树中第一个元素的内高度(内容区域高度+上下内边距)，不包括上下边框
-            ///</summary>
-            ///<returns type="Number"/>
-
             var $ = this.first(),
                 e = this[0];
             if (e) {
@@ -2925,9 +2827,8 @@
                 var box = this.style('box-sizing');
 
                 if (box === 'border-box') { //边框盒子，减掉外上下边距
-                    var mt = Math.round(parseFloat(this.style('margin-top'))) || 0,
-                        mb = Math.round(parseFloat(this.style('margin-bottom'))) || 0;
-                    hh = hh - (mt + mb);
+                    hh -= Math.round(parseFloat(this.style('margin-top'))) || 0;
+                    hh -= Math.round(parseFloat(this.style('margin-bottom'))) || 0;
                 }
                 //减掉上下边框
                 hh -= Math.round(parseFloat($.style('border-top-width'))) || 0;
@@ -2936,12 +2837,8 @@
             }
         },
 
+        ///检索DOM元素的宽度(内容区域宽度+左右内边距+左右边框)
         offsetWidth: function() {
-            ///<summary>
-            ///检索DOM树中第一个元素的宽度(内容区域宽度+左右内边距+左右边框
-            ///</summary>
-            ///<returns type="Number"/>
-
             var $ = this.first(),
                 e = this[0];
             if (e) {
@@ -2952,20 +2849,14 @@
                 var box = $.style('box-sizing');
 
                 if (box === 'border-box') { //边框盒子，减掉左右外边距，保留左右边框
-                    var ml = Math.round(parseFloat($.style('margin-left'))) || 0,
-                        mr = Math.round(parseFloat($.style('margin-right'))) || 0;
-                    ww = ww - (ml + mr);
+                    ww -= Math.round(parseFloat($.style('margin-left'))) || 0;
+                    ww -= Math.round(parseFloat($.style('margin-right'))) || 0;
                 }
                 return ww > 0 ? ww : 0;
             }
         },
 
         offsetHeight: function() {
-            ///<summary>
-            ///检索DOM树中第一个元素的高度(内容区域高度+上下内边距+上下边框)
-            ///</summary>
-            ///<returns type="Number"/>
-
             var $ = this.first(),
                 e = this[0];
             if (e) {
@@ -2976,20 +2867,15 @@
                 var box = this.style('box-sizing');
 
                 if (box === 'border-box') { //边框盒子，减掉上下外边距，保留上下边框
-                    var mt = Math.round(parseFloat(this.style('margin-top'))) || 0,
-                        mb = Math.round(parseFloat(this.style('margin-bottom'))) || 0;
-                    hh = hh - (mt + mb);
+                    ww -= Math.round(parseFloat($.style('margin-top'))) || 0;
+                    ww -= Math.round(parseFloat($.style('margin-bottom'))) || 0;
                 }
                 return hh > 0 ? hh : 0;
             }
         },
 
+        ///检索DOM元素的外宽度(内容区域宽度+左右内边距+左右边框+左右外边距)
         outerWidth: function() {
-            ///<summary>
-            ///检索DOM树中第一个元素的外宽度(内容区域宽度+左右内边距+左右边框+左右外边距)
-            ///</summary>
-            ///<returns type="Number"/>
-
             var $ = this.first(),
                 e = this[0];
             if (e) {
@@ -3008,11 +2894,6 @@
         },
 
         outerHeight: function() {
-            ///<summary>
-            ///检索DOM树中第一个元素的外高度(内容区域高度+上下内边距+上下边框+上下外边距)
-            ///</summary>
-            ///<returns type="Number"/>
-
             var $ = this.first(),
                 e = this[0];
             if (e) {
@@ -3030,117 +2911,69 @@
             }
         },
 
+        ///检索DOM元素的最近动态定位包含元素，如通过relative/absoute/fixed等设置position的，所有的偏移量都根据该元素来决定
         offsetParent: function() {
-            ///<summary>
-            ///检索DOM树中元素的最近动态定位包含元素，如通过relative/absoute/fixed等设置position的，所有的偏移量都根据该元素来决定
-            ///&#10;此方法只检索DOM树中的第一个元素
-            ///</summary>
-            ///<returns type="Element"/>
-
             var e = this[0];
-            if (e)
-                return e.offsetParent;
-            return null;
+            return new _M_(e && e.offsetParent);
         },
 
+        /*
+         *设置或检索DOM元素的左边界到它的offsetParent左边界的偏移量(相对定位)
+         *当有参数时，表示为各元素设置左边界偏移量(若元素position是static，则会自动更改为relative)，否则是获取第一个元素的左边界偏移量
+         *参数：左边界偏移量，可以是数值(被当作是像素单位)也可以是字符串(如css中设置，100px/2em/50%/auto等，若无单位，API会自动加上像素单位)
+         */
         offsetLeft: function(ol) {
-            ///<summary>
-            ///设置或检索DOM树中元素的左边界到它的offsetParent左边界的偏移量(相对定位)
-            ///&#10;当有参数时，表示为各元素设置左边界偏移量(若元素position是static，则会自动更改为relative)，否则是获取第一个元素的左边界偏移量
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素的左边界偏移量
-            ///</summary>
-            ///<param name="ol" type="Number|String" optional="true">
-            ///左边界偏移量，可以是数值(被当作是像素单位)也可以是字符串(如css中设置，100px/2em/50%/auto等，若无单位，API会自动加上像素单位)
-            ///</param>
-            ///<returns type="My|Number"/>
-
             if (ol === undefined) {
                 var e = this[0];
-                if (e)
-                    return e.offsetLeft;
-            } else {
-                var rl = addPxUnit(ol);
-                if (rl) {
-                    this.each(function() {
-                        var $ = new _M_(this);
-                        var p = $.style('position');
-                        if (p === 'static')
-                            $.style('position', 'relative');
-                        $.style('left', rl);
-                    });
-                }
-                return this;
+                return e && e.offsetLeft;
             }
+
+            var rl = addPxUnit(ol);
+            rl && this.each(function() {
+                var $ = new _M_(this),
+                    p = $.style('position');
+                p === 'static' && $.style('position', 'relative');
+                $.style('left', rl);
+            });
+            return this;
         },
 
         offsetTop: function(ot) {
-            ///<summary>
-            ///设置或检索DOM树中元素的上边界到它的offsetParent上边界的偏移量(相对定位)
-            ///&#10;当有参数时，表示为各元素设置上边界偏移量(若元素position是static，则会自动更改为relative)，否则是获取第一个元素的上边界偏移量
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素的上边界偏移量
-            ///</summary>
-            ///<param name="ot" type="Number|String" optional="true">
-            ///上边界偏移量，可以是数值(被当作是像素单位)也可以是字符串(如css中设置，100px/2em/50%/auto等，若无单位，API会自动加上像素单位)
-            ///</param>
-            ///<returns type="My|Number"/>
-
             if (ot === undefined) {
                 var e = this[0];
-                if (e)
-                    return e.offsetTop;
-            } else {
-                var rt = addPxUnit(ot);
-                if (rt) {
-                    this.each(function() {
-                        var $ = new _M_(this);
-                        var p = $.style('position');
-                        if (p === 'static')
-                            $.style('position', 'relative');
-                        $.style('top', rt);
-                    });
-                }
-                return this;
+                return e && e.offsetTop;
             }
+
+            var rt = addPxUnit(ot);
+            rt && this.each(function() {
+                var $ = new _M_(this),
+                    p = $.style('position');
+                p === 'static' && $.style('position', 'relative');
+                $.style('top', rt);
+            });
+            return this;
         },
 
+        ///设置或检索DOM元素的左/上偏移量(即offsetLeft和offsetTop)
         offset: function(o) {
-            ///<summary>
-            ///设置或检索DOM树中元素的左/上边界到它的offsetParent左/上边界的偏移量(相对定位)
-            ///&#10;当有参数时，表示为各元素设置左/上边界偏移量(若元素position是static，则会自动更改为relative)，否则是获取第一个元素的左/上边界偏移量
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素的左/上边界偏移量，结构如{left:*,top:*}
-            ///</summary>
-            ///<param name="o" type="Object" optional="true">
-            ///左/上边界偏移量，结构如{left:*,top:*}
-            ///</param>
-            ///<returns type="My|Object"/>
-
             if (o === undefined) {
                 return {
                     left: this.offsetLeft(),
                     top: this.offsetTop()
                 }
-            } else {
-                this.offsetLeft(o.left);
-                this.offsetTop(o.top);
-                return this;
             }
+
+            this.offsetLeft(o.left);
+            this.offsetTop(o.top);
+            return this;
         },
 
+        /*
+         *设置或检索DOM元素的左顶点位置(绝对定位，相对于页面body)
+         *当有参数时，为设置各元素的左顶点(若元素position是static，则会自动更改为absolute)，否则为获取第一个元素的左顶点
+         *参数：左顶点值，可以是数值(被当作是像素单位)也可以是字符串(如css中设置，100px/2em/50%/auto等，若无单位，API会自动加上像素单位)
+         */
         left: function(v) {
-            ///<summary>
-            ///设置或检索DOM树中元素的左顶点位置(绝对定位，相对于页面body)
-            ///&#10;当有参数时，为设置各元素的左顶点(若元素position是static，则会自动更改为absolute)，否则为获取第一个元素的左顶点
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素的左顶点
-            ///</summary>
-            ///<param name="v" type="Number|String" optional="true">
-            ///左顶点值，可以是数值(被当作是像素单位)也可以是字符串(如css中设置，100px/2em/50%/auto等，若无单位，API会自动加上像素单位)
-            ///</param>
-            ///<returns type="My|Number"/>
-
             if (v === undefined) {
                 var e = this[0];
                 if (e) {
@@ -3151,33 +2984,20 @@
                     }
                     return l;
                 }
-            } else {
-                var rl = addPxUnit(v);
-                if (rl) {
-                    this.each(function() {
-                        var $ = new _M_(this);
-                        var p = $.style('position');
-                        if (p === 'static')
-                            $.style('position', 'absolute');
-                        $.style('left', rl);
-                    });
-                }
-                return this;
+                return;
             }
+
+            var rl = addPxUnit(v);
+            rl && this.each(function() {
+                var $ = new _M_(this),
+                    p = $.style('position');
+                p === 'static' && $.style('position', 'absolute');
+                $.style('left', rl);
+            });
+            return this;
         },
 
         top: function(v) {
-            ///<summary>
-            ///设置或检索DOM树中元素的上顶点位置(绝对定位，相对于页面body)
-            ///&#10;当有参数时，为设置各元素的上顶点(若元素position是static，则会自动更改为absolute)，否则为获取第一个元素的上顶点
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素的上顶点
-            ///</summary>
-            ///<param name="v" type="Number|String" optional="true">
-            ///上顶点值，可以是数值(被当作是像素单位)也可以是字符串(如css中设置，100px/2em/50%/auto等，若无单位，API会自动加上像素单位)
-            ///</param>
-            ///<returns type="My|Number"/>
-
             if (v === undefined) {
                 var e = this[0];
                 if (e) {
@@ -3188,127 +3008,72 @@
                     }
                     return t;
                 }
-            } else {
-                var rt = addPxUnit(v);
-                if (rt) {
-                    this.each(function() {
-                        var $ = new _M_(this);
-                        var p = $.style('position');
-                        if (p === 'static')
-                            $.style('position', 'absolute');
-                        $.style('top', rt);
-                    });
-                }
-                return this;
+                return;
             }
+
+            var rt = addPxUnit(v);
+            rt && this.each(function() {
+                var $ = new _M_(this),
+                    p = $.style('position');
+                p === 'static' && $.style('position', 'absolute');
+                $.style('top', rt);
+            });
+            return this;
         },
 
+        ///设置或检索DOM元素的坐标位置(即left和top)
         position: function(pos) {
-            ///<summary>
-            ///设置或检索DOM树中元素的坐标位置(绝对定位，相对于页面body)
-            ///&#10;当有参数时，为设置各元素的坐标位置(若元素position是static，则会自动更改为absolute)，否则为获取第一个元素的坐标位置
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，返回第一个元素的坐标位置，即{left:*,top:*}
-            ///</summary>
-            ///<param name="pos" type="Object" optional="true">
-            ///坐标位置，结构如{left:*,top:*}
-            ///</param>
-            ///<returns type="My|Object"/>
-
             if (pos === undefined) {
                 return {
                     left: this.left(),
                     top: this.top()
                 };
-            } else {
-                this.left(pos.left);
-                this.top(pos.top);
-                return this;
             }
+
+            this.left(pos.left);
+            this.top(pos.top);
+            return this;
         },
 
+        ///检索DOM元素包括滚动条的完整宽度
+        ///当csss设置overflow/overflow-x=scroll/auto，在滚动条出现时，此值和width不同，包括了滚动条以下不可见部分的宽度，而width只是可见部分的宽度
         scrollWidth: function() {
-            ///<summary>
-            ///检索DOM树中元素包括滚动条的完整宽度
-            ///&#10;当csss设置overflow/overflow-x=scroll/auto，在滚动条出现时，此值和width不同，包括了滚动条以下不可见部分的宽度，而width只是可见部分的宽度
-            ///&#10;此方法只返回第一个元素包括滚动条的完整宽度，数值，单位为像素
-            ///</summary>
-            ///<returns type="Number"/>
-
             var e = this[0];
-            if (e)
-                return e.scrollWidth;
+            return e && e.scrollWidth;
         },
 
         scrollHeight: function() {
-            ///<summary>
-            ///检索DOM树中元素包括滚动条的完整高度
-            ///&#10;当csss设置overflow/overflow-y=scroll/auto，在滚动条出现时，此值和height不同，包括了滚动条以下不可见部分的高度，而height只是可见部分的高度
-            ///&#10;此方法只返回第一个元素包括滚动条的完整高度，数值，单位为像素
-            ///</summary>
-            ///<returns type="Number"/>
-
             var e = this[0];
-            if (e)
-                return e.scrollHeight;
+            return e && e.scrollHeight;
         },
 
+        ///设置或检索DOM元素已经滚动的左边界像素
+        ///只在元素有滚动条的时候才有用(如csss设置overflow/overflow-x=scroll/auto)
         scrollLeft: function(v) {
-            ///<summary>
-            ///设置或检索DOM树中元素已经滚动的左边界像素
-            ///&#10;只在元素有滚动条的时候才有用(如csss设置overflow/overflow-x=scroll/auto)
-            ///&#10;当有参数时，表示是设置行为
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，则返回第一个元素已经滚动的左边界像素值
-            ///</summary>
-            ///<param name="v" type="Number" optional="true">要设置给有滚动条元素应该滚动的左边界像素</param>
-            ///<returns type="My|Number"/>
-
             if (v === undefined) {
                 var e = this[0];
-                if (e)
-                    return e.scrollLeft;
-            } else {
-                if (mnumber.isNumber(v)) {
-                    this.each(function() {
-                        this.scrollLeft = v;
-                    });
-                    return this;
-                }
+                return e && e.scrollLeft;
             }
+
+            mnumber.isNumber(v) && this.each(function() {
+                this.scrollLeft = v;
+            });
+            return this;
         },
 
         scrollTop: function(v) {
-            ///<summary>
-            ///设置或检索DOM树中元素已经滚动的上边界像素
-            ///&#10;只在元素有滚动条的时候才有用(如csss设置overflow/overflow-y=scroll/auto)
-            ///&#10;当有参数时，表示是设置行为
-            ///&#10;当是设置行为，返回本My对象
-            ///&#10;当是检索行为，则返回第一个元素已经滚动的上边界像素值
-            ///</summary>
-            ///<param name="v" type="Number" optional="true">要设置给有滚动条元素应该滚动的上边界像素</param>
-            ///<returns type="My|Number"/>
-
             if (v === undefined) {
                 var e = this[0];
-                if (e)
-                    return e.scrollTop;
-            } else {
-                if (mnumber.isNumber(v)) {
-                    this.each(function() {
-                        this.scrollTop = v;
-                    });
-                    return this;
-                }
+                return e && e.scrollTop;
             }
+
+            mnumber.isNumber(v) && this.each(function() {
+                this.scrollTop = v;
+            });
+            return this;
         },
 
         show: function() {
-            ///<summary>
-            ///显示DOM树中各元素
-            ///</summary>
-            ///<returns type="My"/>
-
             this.each(function() {
                 this.style.display = '';
             });
@@ -3316,11 +3081,6 @@
         },
 
         hide: function() {
-            ///<summary>
-            ///隐藏DOM树中各元素
-            ///</summary>
-            ///<returns type="My"/>
-
             this.each(function() {
                 this.style.display = 'none';
             });
@@ -3328,34 +3088,23 @@
         },
 
         toggle: function() {
-            ///<summary>
-            ///给DOM树中各元素设置显示与隐藏开关，若显示则隐藏、否则显示
-            ///</summary>
-            ///<returns type="My"/>
-
             this.each(function() {
                 this.style.display === 'none' ? this.style.display = '' : this.style.display = 'none';
             });
             return this;
         },
 
-        cls: function(cls) {
-            ///<signature>
-            ///<summary>
-            ///检索DOM树中第一个元素的类样式
-            ///</summary>
-            ///<returns type="Array"/>
-            ///</signature>
-            ///<signature>
-            ///<summary>
-            ///设置DOM树中各元素的类样式
-            ///&#10;此方法将会覆盖元素先前指定的所有类样式
-            ///</summary>
-            ///<param name="cls" type="String">类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'</param>
-            ///<returns type="My"/>
-            ///</signature>
+        ///返回元素的可见性(display或visibility状态)，只返回第一个元素
+        getVisible: function() {
+            var e = this[0];
+            return e && (e.style.display !== '' && e.style.visibility !== 'hidden');
+        },
 
-            if (cls === undefined) return this[0] ? this[0].className.replace(/\s+/, ' ').split(' ') : [];
+        ///设置或检索DOM第一个元素的类样式
+        ///当是设置，此方法将会覆盖元素先前指定的所有类样式
+        ///参数：类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'
+        cls: function(cls) {
+            if (cls === undefined) return this[0] && this[0].className ? this[0].className.replace(/\s+/, ' ').split(' ') : [];
 
             this.each(function() {
                 this.className = cls;
@@ -3363,47 +3112,32 @@
             return this;
         },
 
+        ///添加类样式
+        ///参数：类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'
         addClass: function(cls) {
-            ///<summary>
-            ///给DOM树中各元素添加类样式
-            ///</summary>
-            ///<param name="cls" type="String">类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'</param>
-            ///<returns type="My"/>
-
             if (mstring.isString(cls)) {
                 cls = cls.split(' ');
                 this.each(function() {
-                    for (var i = 0, l = cls.length, c; i < l; i++) {
-                        c = cls[i];
-                        if (!My(this).hasClass(c))
-                            this.className += (this.className ? ' ' : '') + c;
-                    }
+                    marray.each.call(this, cls, function(c) {
+                        My(this).hasClass(c) || (this.className += (this.className ? ' ' : '') + c);
+                    });
                 });
             }
             return this;
         },
 
+        ///删除类样式
+        ///参数：类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'
         removeClass: function(cls) {
-            ///<summary>
-            ///给DOM树中各元素删除类样式
-            ///</summary>
-            ///<param name="cls" type="String">类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'</param>
-            ///<returns type="My"/>
-
             if (mstring.isString(cls)) {
                 cls = cls.split(' ');
                 this.each(function() {
-                    var cs = this.className.replace(/\s+/, ' ').split(' ');
+                    var cs = this.className && this.className.replace(/\s+/, ' ').split(' ') || [];
                     if (cs.length) {
-                        var i = 0,
-                            l = cls.length,
-                            c, j;
-                        for (; i < l; i++) {
-                            c = cls[i];
-                            j = cs.indexOf(c);
-                            if (j > -1)
-                                cs.splice(j, 1);
-                        }
+                        marray.each(cls, function(c) {
+                            var j = cs.indexOf(c);
+                            j > -1 && cs.splice(j, 1);
+                        });
                         this.className = cs.join(' ');
                     }
                 });
@@ -3411,237 +3145,160 @@
             return this;
         },
 
+        ///设置类样式开关，若元素中有该类样式则删除，否则就添加
+        ///类样式名，只能是一个类名，不能是连续的多类名
         toggleClass: function(cls) {
-            ///<summary>
-            ///给DOM树中各元素设置类样式开关，若元素中有该类样式则删除，否则就添加
-            ///</summary>
-            ///<param name="cls" type="String">类样式名，只能是一个类名，不能是连续的多类名</param>
-            ///<returns type="My"/>
-
-            return this.hasClass(cls) ? this.removeClass(cls) : this.addClass(cls);
+            return this.hasClass(cls) && this.removeClass(cls) || this.addClass(cls);
         },
 
+        ///判断元素是否有指定的类样式
+        ///类样式名，只能是一个类名，不能是连续的多类名
         hasClass: function(cls) {
-            ///<summary>
-            ///判断元素是否有指定的类样式
-            ///</summary>
-            ///<param name="cls" type="String">类样式名，只能是一个类名，不能是连续的多类名</param>
-            ///<returns type="Boolean"/>
-
             var r = false;
             this.each(function() {
-                var cs = My(this).cls();
-                for (var i = 0, len = cs.length; i < len; i++) {
-                    if (cs[i] === cls) {
+                return marray.each(My(this).cls(), function(c) {
+                    if (c === cls) {
                         r = true;
                         return false;
                     }
-                }
+                    return true;
+                });
             });
             return r;
         },
 
+        /*
+         *设置或检索DOM元素样式(设置在style属性上的样式)
+         *样式名(font-size/fontSize形式都可)，可以是字符串，如color、backgroud等;也可以是一个数组，表示多个样式，[name1,name2,name3,...]
+         *还可以是样式对，字面量{name:value,name:value}，表示是设置行为，此时将忽略第二个参数
+         */
         style: function(name, value) {
-            ///<summary>
-            ///设置或检索DOM树中各元素样式(设置在style属性上的样式)
-            ///&#10;当第一个参数是字符串或数组，且无第二个参数，则属于检索行为，否则是设置行为，此时第一个参数可以是字符串和数组，也可以是一个字面量样式对
-            ///&#10;若是设置行为，则返回本My对象
-            ///&#10;若是检索行为，只返回第一个元素的样式，当只检索一个样式，则返回该样式值(无该样式返回null)，当是检索一组样式，则返回样式值数组(无任何匹配的样式返回长度为0的空数组)
-            ///</summary>
-            ///<param name="name" type="String|Array|Object">
-            ///样式名(font-size/fontSize形式都可)，可以是字符串，如color、backgroud等;也可以是一个数组，表示多个样式，[name1,name2,name3,...]
-            ///&#10;还可以是样式对，字面量{name:value,name:value}，表示是设置行为，此时将忽略第二个参数
-            ///</param>
-            ///<param name="value" type="String|Number|Array" optional="true">样式值，字符串或数值，与css样式一样；也可以是一个数组，表示多个样式值，与为数组的name一一对应</param>
-            ///<returns type="My|String|Number|Array"/>
-
-            if (value === undefined && !mobject.isPlainObject(name)) { //检索
+            if (value === undefined && !mobject.isPlainObject(name)) {
                 var e = this[0];
                 if (e) {
-                    var attrStyle = function(attr) {
+                    function attrStyle(attr) {
                         if (e.style[attr])
                             return e.style[attr];
-                        else if (e.currentStyle)
+                        if (e.currentStyle)
                             return e.currentStyle[attr];
-                        else if (document.defaultView && document.defaultView.getComputedStyle)
+                        if (document.defaultView && document.defaultView.getComputedStyle)
                             return document.defaultView.getComputedStyle(e, null).getPropertyValue(mstring.joinCase(attr));
-                        else
-                            return null;
+                        return null;
                     }
 
                     if (marray.isArray(name)) {
-                        var ret = [],
-                            v, i = 0,
-                            l = name.length;
-                        for (; i < l; i++) {
-                            v = attrStyle(mstring.camelCase(name[i]));
-                            if (v)
-                                ret.push(v === 'auto' ? '' : v);
-                        }
-                        return ret;
+                        return marray.map(name, function(v) {
+                            v = attrStyle(mstring.camelCase(v));
+                            return v === 'auto' ? '' : v;
+                        });
                     }
                     var v2 = attrStyle(mstring.camelCase(name));
                     return v2 === 'auto' ? '' : v2;
                 }
-            } else { //设置
-                var ts = '';
-                if (mstring.isString(name))
-                    ts = mstring.joinCase(name) + ':' + value; //wordWord先转成word-word
-
-                if (marray.isArray(name) && marray.isArray(value)) {
-                    for (var j = 0, l = name.length; j < l; j++)
-                        ts += mstring.joinCase(name[j]) + ':' + value[j] + ';';
-                }
-
-                if (mobject.isPlainObject(name)) {
-                    for (var k in name)
-                        ts += mstring.joinCase(k) + ':' + name[k] + ';';
-                }
-                this.each(function() {
-                    this.style.cssText += ' ;' + ts;
-                });
-                return this;
+                return;
             }
-        },
 
-        removeStyle: function(name) {
-            ///<summary>
-            ///给DOM树中各元素删除样式(删除设置在style属性上的样式)
-            ///</summary>
-            ///<param name="name" type="String|Array|Object">
-            ///样式名(font-size/fontSize)，可以是字符串，如color、backgroud等；name也可以是一个数组，表示删除多个样式，[name1,name2,name3,...]
-            ///</param>
-            ///<returns type="My"/>
+            var ts = '';
+            mstring.isString(name) && (ts = mstring.joinCase(name) + ':' + value); //wordWord先转成word-word
 
-            if (mstring.isString(name) || marray.isArray(name)) {
-                this.each(function() {
-                    var ss = '',
-                        so = this.style.cssText.split(';');
-                    if (so.length) {
-                        var fn = function(na) {
-                            var fl, i = 0,
-                                l = so.length;
-                            for (; i < l; i++) {
-                                fl = so[i].split(':');
-                                if (mstring.trim(fl[0]).toLowerCase() === mstring.joinCase(na)) {
-                                    so.splice(i, 1);
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (marray.isArray(name)) {
-                            for (var i = 0, l = name.length; i < l; i++) {
-                                fn(name[i]);
-                            }
-                        } else fn(name);
-
-                        this.style.cssText = so.join(';');
-                    }
-                });
+            if (marray.isArray(name) && marray.isArray(value)) {
+                ts = marray.map(name, function(n, i) {
+                    return mstring.joinCase(n) + ':' + value[i];
+                }).join(';');
             }
+
+            if (mobject.isPlainObject(name)) {
+                ts = mobject.map(name, function(n, k) {
+                    return mstring.joinCase(k) + ':' + n;
+                }).join(';');
+            }
+
+            this.each(function() {
+                this.style.cssText += ' ;' + ts;
+            });
             return this;
         },
 
-        clearStyle: function() {
-            ///<summary>
-            ///给DOM树中各元素清空元素的样式 (清空设置在style属性上的样式)
-            ///</summary>
-            ///<returns type="My"/>
+        ///删除样式(删除设置在style属性上的样式)
+        ///样式名(font-size/fontSize形式都可)，可以是字符串，如color、backgroud等;也可以是一个数组，表示多个样式，[name1,name2,name3,...]
+        removeStyle: function(name) {
+            mstring.isString(name) && (name = [name]);
+            this.each(function() {
+                var so = this.style.cssText.split(';');
+                if (so.length) {
+                    function fn(na) {
+                        marray.each(so, function(s, i) {
+                            var fl = s.split(':');
+                            if (mstring.trim(fl[0]).toLowerCase() === mstring.joinCase(na)) {
+                                so.splice(i, 1);
+                                return false;
+                            }
+                        });
+                    }
 
+                    marray.each(name, function(n) {
+                        fn(n);
+                    });
+                    this.style.cssText = so.join(';');
+                }
+            });
+            return this;
+        },
+
+        ///清空元素的样式 (清空设置在style属性上的样式)
+        clearStyle: function() {
             this.each(function() {
                 this.style.cssText = '';
             });
             return this;
         },
 
+        ///注册事件（包括自定义事件）
         on: function(ty, fn, arg) {
-            ///<summary>
-            ///给DOM树中各元素注册DOM事件（自定义事件无效）
-            ///</summary>
-            ///<param name="ty" type="String">事件类型</param>
-            ///<param name="fn" type="Function">事件函数</param>
-            ///<param name="arg" type="Object" optional="true">需要传递给每一个处理函数的额外参数</param>
-            ///<returns type="My"/>
-
             this.each(function() {
-                devent.on(this, ty, fn, arg);
+                base.on(this, ty, fn, arg);
             });
             return this;
         },
 
-        off: function(ty, fn) {
-            ///<summary>
-            ///给DOM树中各元素注销DOM事件
-            ///</summary>
-            ///<param name="ty" type="String">事件类型</param>
-            ///<param name="fn" type="Function">事件函数，此函数必须是和注册事件的函数是同一个引用，否则注销无效</param>
-            ///<returns type="My"/>
-
-            this.each(function() {
-                devent.off(this, ty, fn);
-            });
-            return this;
-        },
-
-        release: function(ty) {
-            ///<summary>
-            ///给DOM树中各元素释放所有或指定的DOM事件
-            ///</summary>
-            ///<param name="ty" type="String">事件类型，当指定该值，则表示释放指定的DOM事件，否则表示释放所有的DOM事件</param>
-            ///<returns type="My"/>
-
-            this.each(function() {
-                devent.release(this, ty);
-            });
-            return this;
-        },
-
+        ///注册一个一次性事件（包括自定义事件），此事件只会执行一次，之后就会被注销
         once: function(ty, fn, arg) {
-            ///<summary>
-            ///给DOM树中各元素注册一个一次性DOM事件
-            ///&#10;此事件只会执行一次，之后就会被注销
-            ///</summary>
-            ///<param name="ty" type="String">事件类型</param>
-            ///<param name="fn" type="Function">事件函数</param>
-            ///<param name="arg" type="Object" optional="true">需要传递给每一个处理函数的额外参数</param>
-            ///<returns type="My"/>
-
-            var that = this;
-            this.on(ty, function(e) {
-                that.off(ty, arguments.callee);
-                fn.call(this, e, arg);
+            this.each(function() {
+                base.once(this, ty, fn, arg);
             });
             return this;
         },
 
+        ///注销事件（包括自定义事件）
+        off: function(ty, fn) {
+            this.each(function() {
+                base.off(this, ty, fn);
+            });
+            return this;
+        },
+
+        ///释放所有或指定的事件（包括自定义事件）
+        release: function(ty) {
+            this.each(function() {
+                base.release(this, ty);
+            });
+            return this;
+        },
+
+        ///触发所有指定事件（包括自定义事件）
         trigger: function(ty) {
-            ///<summary>
-            ///触发DOM树中各元素的所有指定DOM事件
-            ///</summary>
-            ///<param name="ty" type="String">事件类型</param>
-            ///<returns type="My"/>
-
             this.each(function() {
-                devent.trigger(this, ty);
+                base.trigger(this, ty);
             });
             return this;
         },
 
+        ///鼠标移入移出
         hover: function(over, out) {
-            ///<summary>
-            ///鼠标移入移出
-            ///</summary>
-            ///<param name="over" type="Function">鼠标移入事件回调函数</param>
-            ///<param name="out" type="Function">鼠标移出事件回调函数</param>
-            ///<returns type="My"/>
-
             this.each(function() {
-                var $ = new _M_(this);
-                $.mouseover(function() {
+                My(this).mouseover(function() {
                     over.call(this);
-                });
-                $.mouseout(function() {
+                }).mouseout(function() {
                     out.call(this);
                 });
             });
