@@ -204,6 +204,14 @@
                     return marray.fill(a, start, number, value);
             },
 
+            merge: function(dest, source) {
+                if (marray.isArray(dest))
+                    return marray.merge(dest, source);
+
+                if (mobject.isPlainObject(dest))
+                    return mobject.merge(dest);
+            },
+
             inherit: function(subCls, superCls, args) {
                 function F() {};
                 F.prototype = superCls.prototype;
@@ -276,7 +284,7 @@
 
                 var loader = null;
                 if (opts.jsonp) {
-                    loader = new base.Jsonper();
+                    loader = new base.JSONPer();
                     loader.callback = opts.callback || this.ajaxSettings.callback;
                 } else {
                     loader = new base.Loader();
@@ -362,14 +370,14 @@
                 return {
                     json: JSON.stringify(data),
                     xml: this.serializeXML(data)
-                }[type || dataType.JSON];
+                }[type || 'json'];
             },
 
             parse: function(data, type) {
                 return {
                     json: JSON.parse(data),
                     xml: this.parseXML(data)
-                }[type || dataType.JSON];
+                }[type || 'json'];
             },
 
             serializeXML: function(xml) {
@@ -734,6 +742,16 @@
                 ret[k] = this.isPlainObject(d) ? this.clone(d, true) : marray.clone(d, true);
             });
             return ret;
+        },
+
+        merge: function(dest, source) {
+            if (!this.isPlainObject(source))
+                return null;
+
+            this.each(source, function(v, k) {
+                dest[k] = v;
+            });
+            return dest;
         }
     };
 
@@ -965,7 +983,7 @@
             return ret;
         },
 
-        sortOn: function(arr, field, type) {
+        order: function(arr, field, type) {
             if (!this.isArray(arr) || this.isEmpty(arr))
                 return;
 
@@ -993,7 +1011,7 @@
             });
         },
 
-        uniqueOn: function(arr, field) {
+        unique: function(arr, field) {
             if (!this.isArray(arr) || this.isEmpty(arr))
                 return null;
 
@@ -1021,7 +1039,7 @@
         },
 
         merge: function(dest, source) {
-            if (!this.isArray(dest) || !this.isArray(source))
+            if (!this.isArray(source))
                 return null;
 
             this.each(source, function(v) {
@@ -1037,7 +1055,7 @@
             return toString.call(d) === '[object Date]';
         },
 
-        format: function(d, fmt) {
+        formatDate: function(d, fmt) {
             mnumber.isNumber(d) && (d = new Date(d));
 
             if (!this.isDate(d))
@@ -1282,13 +1300,15 @@
         }
     };
 
+    base.plugin('Color', mcolor);
+
     ///定义事件类型（包含原生的DOM事件类型和已知的自定义事件类型）
     var eventType = {},
         originalEventTypes = [],
         ///鼠标事件类型列表
         mouseEventTypes = [
             'click',
-            'dbclick',
+            'dblclick',
             'mousedown',
             'mousemove',
             'mouseup',
@@ -1315,21 +1335,18 @@
 
         ///表单事件类型列表
         formEventTypes = [
-            'submit',
-            'reset',
             'change',
-            'formchange',
-            'forminput',
             'input',
             'invalid',
-            'blur',
+            'select',
+            'submit',
+            'reset',
             'focus',
-            'select'
+            'blur'
         ],
 
         ///其他DOM事件类型列表
         domEventTypes = [
-            'contextmenu',
             'resize',
             'scroll',
             'load',
@@ -1687,14 +1704,14 @@
                 var _ = this;
                 this.timer = setInterval(function() {
                     _.curCount++;
-                    _.trigger(eventType.TIMER, null, _);
+                    _.trigger('timer', null, _);
                     if (_.totalCount > 0 && _.curCount === _.totalCount) {
                         _.stop();
-                        _.trigger(eventType.COMPLETE, null, _);
+                        _.trigger('complete', null, _);
                     }
                 }, this.delay * 1000);
                 this.running = true;
-                this.trigger(eventType.START, null, this);
+                this.trigger('start', null, this);
             }
         },
 
@@ -1705,7 +1722,7 @@
                 this.curCount = 0;
                 this.totalCount = 0;
                 this.running = false;
-                this.trigger(eventType.STOP, null, this);
+                this.trigger('stop', null, this);
             }
         },
 
@@ -1713,7 +1730,7 @@
             if (this.timer != -1) {
                 this.curCount = 0;
                 this.running = false;
-                this.trigger(eventType.RESET, null, this);
+                this.trigger('reset', null, this);
             }
         }
     });
@@ -1764,7 +1781,7 @@
         ///请求方式：GET/POST，默认GET，大小写都可以
         method: 'GET',
         ///远程请求返回的数据格式类型，默认为json，其他可以是xml、html、文本、二进制字节流等，可以调用dataType对象中列举的任一种
-        dataType: dataType.JSON,
+        dataType: 'json',
         ///本次请求的数据内容类型，默认为表单内容，其他可以是contentType对象中列举的任一种
         contentType: contentType.FORM,
         ///是否对远程请求返回的数据进行解析，默认解析数据(true)
@@ -1809,7 +1826,7 @@
             mstring.isEmpty(url) || (this.url = url);
 
             if (mstring.isEmpty(this.url)) { //url为空或非法，触发错误事件，错误类型为url错
-                this.trigger(eventType.FAIL, {
+                this.trigger('fail', {
                     code: errorCode.URL_ERROR,
                     message: 'url error'
                 }, this);
@@ -1838,7 +1855,7 @@
             }
             this.requester.abort();
             this.data = null;
-            this.trigger(eventType.DESTROY, null, this);
+            this.trigger('destroy', null, this);
         }
     });
 
@@ -1862,7 +1879,7 @@
                     try {
                         d = parseLoaderData(loader.dataType, d, loader.requester.responseXML);
                     } catch (e) {
-                        loader.trigger(eventType.FAIL, {
+                        loader.trigger('fail', {
                             code: errorCode.PARSE_ERROR,
                             message: 'JSON parse error'
                         }, loader);
@@ -1870,14 +1887,14 @@
                     }
                 }
                 loader.data = d;
-                loader.trigger(eventType.SUCCESS, null, loader);
+                loader.trigger('success', null, loader);
             } else if (loader.requester.status === 404) { //not found
-                loader.trigger(eventType.FAIL, {
+                loader.trigger('fail', {
                     code: errorCode.NOT_FOUND,
                     message: '404,Not Found'
                 }, loader);
             } else { //未知错误
-                loader.trigger(eventType.FAIL, {
+                loader.trigger('fail', {
                     code: errorCode.IO_ERROR,
                     message: 'unknow error'
                 }, loader);
@@ -1894,7 +1911,7 @@
 
     function setLoaderTimeout(loader) {
         loader.abort();
-        loader.trigger(eventType.TIMEOUT, {
+        loader.trigger('timeout', {
             code: errorCode.TIME_OUT,
             message: 'time out error'
         }, loader);
@@ -1907,9 +1924,9 @@
         callbacks = {};
 
     ///JSONP加载器，跨域脚本请求
-    base.Jsonper = function(url, opts) {
-        if (!(this instanceof base.Jsonper))
-            return new base.Jsonper(url, opts);
+    base.JSONPer = function(url, opts) {
+        if (!(this instanceof base.JSONPer))
+            return new base.JSONPer(url, opts);
 
         base.Dispatcher.call(this);
         opts = opts || {};
@@ -1927,12 +1944,12 @@
         this.timeoutWatcher = null; //超时计时器
     }
 
-    base.inherit(base.Jsonper, base.Dispatcher, {
+    base.inherit(base.JSONPer, base.Dispatcher, {
         send: function(url) {
             mstring.isEmpty(url) || (this.url = url);
 
             if (mstring.isEmpty(this.url)) { //url为空或非法，触发错误事件，错误类型为url错
-                this.trigger(eventType.FAIL, {
+                this.trigger('fail', {
                     code: errorCode.URL_ERROR,
                     message: 'url error'
                 }, this);
@@ -1977,7 +1994,7 @@
             this.requester = null;
             delete callbacks[this.callbackName];
             this.callbackName = '';
-            successed || this.trigger(eventType.DESTROY, null, this);
+            successed || this.trigger('destroy', null, this);
         }
     });
 
@@ -1987,7 +2004,7 @@
                 data = parseXssData(xss.dataType, data);
             } catch (e) {
                 xss.abort();
-                xss.trigger(eventType.FAIL, {
+                xss.trigger('fail', {
                     code: errorCode.PARSE_ERROR,
                     message: 'JSON parse error'
                 }, xss);
@@ -1995,7 +2012,7 @@
             }
         }
         xss.data = d;
-        xss.trigger(eventType.SUCCESS, null, xss);
+        xss.trigger('success', null, xss);
         xss.abort(true);
     }
 
@@ -2008,7 +2025,7 @@
 
     function setXssError(xss) {
         xss.abort();
-        xss.trigger(eventType.FAIL, {
+        xss.trigger('fail', {
             code: errorCode.IO_ERROR,
             message: 'unknow error'
         }, xss);
@@ -2016,7 +2033,7 @@
 
     function setXssTimeout(xss) {
         xss.abort();
-        xss.trigger(eventType.TIMEOUT, {
+        xss.trigger('timeout', {
             code: errorCode.TIME_OUT,
             message: 'time out error'
         }, xss);
@@ -2674,43 +2691,91 @@
          *此方法有修正checked/selected/disabled/required/readonly这样的属性，不论设置true或checked/selected/disabled/enabled/required/readonly都可以生效，false或''同理，当是检索行为，只会返回true或false
          */
         attr: function(name, value) {
-            if (mstring.isString(name) && !mstring.isEmpty(name)) {
-                var isPro = ['checked', 'selected', 'disabled', 'enabled', 'required', 'readonly'].indexOf(name) > -1;
+            var isp = mobject.isPlainObject(name),
+                isPro = ['checked', 'selected', 'disabled', 'enabled', 'required', 'readonly'].indexOf(name) > -1;
 
-                if (value === undefined) {
-                    var e = this[0];
-                    if (e) return isPro ? (name === 'enabled' ? !e['disabled'] : e[name]) : e.getAttribute(supportSetAttr ? name : (IEfix[name] || name));
-                    return;
-                }
+            if (base.isUndefined(value) && !isp) {
+                var e = this[0];
+                if (e) {
+                    fn = function(name) {
+                        return isPro ? (name === 'enabled' ? !e['disabled'] : e[name]) : e.getAttribute(supportSetAttr ? name : (IEfix[name] || name))
+                    }
 
-                if (mstring.isString(value) || mnumber.isNumber(value) || typeof value === 'boolean') {
-                    this.each(function() {
-                        if (isPro) {
-                            if (typeof value === 'boolean' || value === name || value === '') {
-                                if (name === 'enabled') {
-                                    name = 'disabled';
-                                    value = !value;
-                                }
-                                value ? this.setAttribute(name, name) : this.removeAttribute(name);
-                            }
-                        } else {
-                            this.setAttribute(supportSetAttr ? name : (IEfix[name] || name), value);
-                        }
-                    });
+                    if (mstring.isString(name))
+                        return fn(name);
+
+                    if (marray.isArray(name)) {
+                        return marray.map(name, function(n) {
+                            return fn(n);
+                        });
+                    }
                 }
-                return this;
-            } else if (mobject.isPlainObject(name)) {
-                for (var k in name) this.attr(k, name[k]);
-                return this;
+                return;
             }
+
+            var ns = name;
+            isp || (ns = {}, ns[name] = value);
+            mobject.each.call(this, ns, function(v, n) {
+                this.each(function() {
+                    if (isPro) {
+                        if (typeof v === 'boolean' || v === n || v === '') {
+                            if (n === 'enabled') {
+                                n = 'disabled';
+                                v = !v;
+                            }
+                            v ? this.setAttribute(n, n) : this.removeAttribute(n);
+                        }
+                        return;
+                    }
+                    this.setAttribute(supportSetAttr ? n : (IEfix[n] || n), v);
+                })
+            });
+            return this;
         },
 
         removeAttr: function(name) {
-            if (mstring.isString(name) && !mstring.isEmpty(name)) {
+            mstring.isString(name) && (name = [name]);
+            marray.each.call(this, name, function(n) {
                 this.each(function() {
-                    this.removeAttribute(supportSetAttr ? name : (IEfix[name] || name));
+                    this.removeAttribute(supportSetAttr ? n : (IEfix[n] || n));
                 });
+            });
+            return this;
+        },
+
+        data: function(name, value) {
+            var isp = mobject.isPlainObject(name);
+
+            if (base.isUndefined(value) && !isp) {
+                var e = this[0];
+                if (e) {
+                    if (mstring.isString(name))
+                        return e.dataset[name];
+
+                    if (marray.isArray(name)) {
+                        return marray.map(name, function(n) {
+                            return e.dataset[n];
+                        });
+                    }
+                }
+                return;
             }
+
+            var ns = name;
+            isp || (ns = {}, ns[name] = value);
+            mobject.each.call(this, ns, function(v, n) {
+                this.each(function() {
+                    this.dataset[n] = v;
+                })
+            });
+            return this;
+        },
+
+        removeData: function(name) {
+            mstring.isString(name) && (name = [name]);
+            marray.each.call(this, name, function(n) {
+                this.data(name, '');
+            });
             return this;
         },
 
@@ -3306,437 +3371,231 @@
         },
 
         click: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册鼠标点击事件，当无参数时，表示触发各元素的click事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.CLICK, fn) : this.trigger(eventType.CLICK);
+            return arguments.length && this.on('click', fn) || this.trigger('click');
         },
 
-        dbclick: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册鼠标双击事件，当无参数时，表示触发各元素的dbclick事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.DBCLICK, fn) : this.trigger(eventType.DBCLICK);
+        dblclick: function(fn) {
+            return arguments.length && this.on('dblclick', fn) || this.trigger('dblclick');
         },
 
         mousedown: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册鼠标按下事件，当无参数时，表示触发各元素的mousedown事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.MOUSEDOWN, fn) : this.trigger(eventType.MOUSEDOWN);
+            return arguments.length && this.on('mousedown', fn) || this.trigger('mousedown');
         },
 
         mouseup: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册鼠标松开事件，当无参数时，表示触发各元素的mouseup事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.MOUSEUP, fn) : this.trigger(eventType.MOUSEUP);
+            return arguments.length && this.on('mouseup', fn) || this.trigger('mouseup');
         },
 
         mousemove: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册鼠标移动事件，当无参数时，表示触发各元素的mousemove事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.MOUSEMOVE, fn) : this.trigger(eventType.MOUSEMOVE);
+            return arguments.length && this.on('mousemove', fn) || this.trigger('mousemove');
         },
 
+        ///注册鼠标移入事件，不论鼠标指针移入事件元素或其子元素都会被触发
         mouseover: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册鼠标移入事件，不论鼠标指针移入事件元素或其子元素都会被触发，当无参数时，表示触发各元素的mouseover事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.MOUSEOVER, fn) : this.trigger(eventType.MOUSEOVER);
+            return arguments.length && this.on('mouseover', fn) || this.trigger('mouseover');
         },
 
+        ///注册鼠标移出事件，不论鼠标指针移出事件元素或其子元素都会被触发
         mouseout: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册鼠标移出事件，不论鼠标指针移出事件元素或其子元素都会被触发，当无参数时，表示触发各元素的mouseout事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.MOUSEOUT, fn) : this.trigger(eventType.MOUSEOUT);
+            return arguments.length && this.on('mouseout', fn) || this.trigger('mouseout');
         },
 
+        ///注册鼠标进入事件，只在鼠标指针进入事件元素时触发，移入子元素不会触发，这点与mouseover事件不同
         mouseenter: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册鼠标进入事件，只在鼠标指针进入事件元素时触发，移入子元素不会触发，这点与mouseover事件不同，当无参数时，表示触发各元素的mouseenter事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.MOUSEENTER, fn) : this.trigger(eventType.MOUSEENTER);
+            return arguments.length && this.on('mouseenter', fn) || this.trigger('mouseenter');
         },
 
+        ///注册鼠标离开事件，只在鼠标指针离开事件元素时触发，移出子元素不会触发，这点与mouseout事件不同
         mouseleave: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册鼠标离开事件，只在鼠标指针离开事件元素时触发，移出子元素不会触发，这点与mouseout事件不同，当无参数时，表示触发各元素的mouseleave事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.MOUSELEAVE, fn) : this.trigger(eventType.MOUSELEAVE);
+            return arguments.length && this.on('mouseleave', fn) || this.trigger('mouseleave');
         },
 
         mousewheel: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册鼠标滚轮滚动事件，当无参数时，表示触发各元素的mousewheel事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.MOUSEWHEEL, fn) : this.trigger(eventType.MOUSEWHEEL);
+            return arguments.length && this.on('mousewheel', fn) || this.trigger('mousewheel');
         },
 
+        ///注册滚动条滚动事件，此事件仅对拥有滚动条的元素(window/iframe或设置了overflow=scroll/auto的元素)起作用
         scroll: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册滚动条滚动事件，当无参数时，表示触发元素的scroll事件
-            ///&#10;此事件仅对拥有滚动条的元素(window/iframe或设置了overflow=scroll/auto的元素)起作用
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.SCROLL, fn) : this.trigger(eventType.SCROLL);
+            return arguments.length && this.on('scroll', fn) || this.trigger('scroll');
         },
 
+        ///注册拖动元素拖动事件
         drag: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册拖动事件，当无参数时，表示触发元素的drag事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.DRAG, fn) : this.trigger(eventType.DRAG);
+            return arguments.length && this.on('drag', fn) || this.trigger('drag');
         },
 
-        drop: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册正在拖动事件，当无参数时，表示触发元素的drop事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.DROP, fn) : this.trigger(eventType.DROP);
-        },
-
+        ///注册拖动元素拖动开始事件
         dragstart: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册拖动开始事件，当无参数时，表示触发元素的dragstart事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.DRAGSTART, fn) : this.trigger(eventType.DRAGSTART);
+            return arguments.length && this.on('dragstart', fn) || this.trigger('dragstart');
         },
 
-        dragover: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册被拖动至有效拖放目标上方时事件，当无参数时，表示触发元素的dragover事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.DRAGOVER, fn) : this.trigger(eventType.DRAGOVER);
-        },
-
-        dragenter: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册被拖动至有效的拖放目标时事件，当无参数时，表示触发元素的dragenter事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.DRAGENTER, fn) : this.trigger(eventType.DRAGENTER);
-        },
-
-        dragleave: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册离开有效拖放目标时事件，当无参数时，表示触发元素的dragleave事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.DRAGLEAVE, fn) : this.trigger(eventType.DRAGLEAVE);
-        },
-
+        ///注册拖动元素拖动结束事件（松开了鼠标）
         dragend: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册拖动结束事件，当无参数时，表示触发元素的dragend事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
+            return arguments.length && this.on('dragend', fn) || this.trigger('dragend');
+        },
 
-            return arguments.length > 0 ? this.on(eventType.DRAGEND, fn) : this.trigger(eventType.DRAGEND);
+        ///注册被拖动至有效拖放目标上方时事件
+        dragover: function(fn) {
+            return arguments.length && this.on('dragover', fn) || this.trigger('dragover');
+        },
+
+        ///注册被拖入有效拖放目标时事件
+        dragenter: function(fn) {
+            return arguments.length && this.on('dragenter', fn) || this.trigger('dragenter');
+        },
+
+        ///注册被拖离有效拖放目标时事件
+        dragleave: function(fn) {
+            return arguments.length && this.on('dragleave', fn) || this.trigger('dragleave');
+        },
+
+        ///注册拖入拖放目标事件（松开了鼠标）
+        drop: function(fn) {
+            return arguments.length && this.on('drop', fn) || this.trigger('drop');
         },
 
         keydown: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册键盘按键事件，当无参数时，表示触发各元素的keydown事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.KEYDOWN, fn) : this.trigger(eventType.KEYDOWN);
+            return arguments.length && this.on('keydown', fn) || this.trigger('keydown');
         },
 
         keypress: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册键盘按住事件，当无参数时，表示触发各元素的keypress事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.KEYPRESS, fn) : this.trigger(eventType.KEYPRESS);
+            return arguments.length && this.on('keypress', fn) || this.trigger('keypress');
         },
 
         keyup: function(fn) {
-            ///<summary>
-            ///给DOM树中各元素注册键盘按键松开事件，当无参数时，表示触发各元素的keyup事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.KEYUP, fn) : this.trigger(eventType.KEYUP);
+            return arguments.length && this.on('keyup', fn) || this.trigger('keyup');
         },
 
+        ///注册表单元素value值被更改事件
+        ///此事件仅对表单元素有效，如form或input=text/password/search/email/url/date/month/week/time/datetime/datetime-local/number/range/color/file/checkbox/radio或select/textarea等
         change: function(fn) {
-            ///<summary>
-            ///给DOM树中各表单元素注册value值被更改事件，当无参数时，表示触发各表单元素的change事件
-            ///&#10;此事件仅对表单元素有效，如input=text/search/email/checkbox/radio或select/textarea等
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.CHANGE, fn) : this.trigger(eventType.CHANGE);
+            return arguments.length && this.on('change', fn) || this.trigger('change');
         },
 
+        ///注册表单元素输入事件，支持的元素同change
+        input: function(fn) {
+            return arguments.length && this.on('input', fn) || this.trigger('input');
+        },
+
+        ///注册表单元素验证失败事件，支持的元素同change，除了form
+        invalid: function(fn) {
+            return arguments.length && this.on('invalid', fn) || this.trigger('invalid');
+        },
+
+        ///注册选取表单元素文本内容事件，input=text/password/search/email/url/number或textarea
+        select: function(fn) {
+            return arguments.length && this.on('select', fn) || this.trigger('select');
+        },
+
+        ///注册form的submit事件
         submit: function(fn) {
-            ///<summary>
-            ///给DOM树中表单注册提交事件，当无参数时，表示触发各表单元素的submit事件
-            ///&#10;此事件仅对表单元素有效，如input=submit/image等
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.SUBMIT, fn) : this.trigger(eventType.SUBMIT);
+            return arguments.length && this.on('submit', fn) || this.trigger('submit');
         },
 
+        ///注册form的reset事件
         reset: function(fn) {
-            ///<summary>
-            ///给DOM树中表单注册重置事件，当无参数时，表示触发各表单元素的reset事件
-            ///&#10;此事件仅对表单有效，表单中应该要有input=reset元素
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.RESET, fn) : this.trigger(eventType.RESET);
+            return arguments.length && this.on('reset', fn) || this.trigger('reset');
         },
 
         focus: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册获得焦点事件，当无参数时，表示触发元素的focus事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.FOCUS, fn) : this.trigger(eventType.FOCUS);
+            return arguments.length && this.on('focus', fn) || this.trigger('focus');
         },
 
         blur: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册失去焦点事件，当无参数时，表示触发元素的blur事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.BLUR, fn) : this.trigger(eventType.BLUR);
+            return arguments.length && this.on('blur', fn) || this.trigger('blur');
         },
 
-        select: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册文本被选中事件，当无参数时，表示触发元素的select事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.SELECT, fn) : this.trigger(eventType.SELECT);
-        },
-
-        contextmenu: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册上下文菜单事件，当无参数时，表示触发元素的contextmenu事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.CONTEXTMENU, fn) : this.trigger(eventType.CONTEXTMENU);
-        },
-
-        formchange: function(fn) {
-            ///<summary>
-            ///给DOM树中各表单注册被更改事件，当无参数时，表示触发各表单的formchange事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.FORMCHANGE, fn) : this.trigger(eventType.FORMCHANGE);
-        },
-
-        forminput: function(fn) {
-            ///<summary>
-            ///给DOM树中各表单注册获得用户输入事件，当无参数时，表示触发各表单的forminput事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.FORMINPUT, fn) : this.trigger(eventType.FORMINPUT);
-        },
-
-        input: function(fn) {
-            ///<summary>
-            ///给DOM树中各表单元素注册获得用户输入事件，当无参数时，表示触发各表单元素的input事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.INPUT, fn) : this.trigger(eventType.INPUT);
-        },
-
-        invalid: function(fn) {
-            ///<summary>
-            ///给DOM树中各表单元素注册输入无效事件，当无参数时，表示触发各表单元素的invalid事件
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">事件函数</param>
-            ///<returns type="My"/>
-
-            return arguments.length > 0 ? this.on(eventType.INVALID, fn) : this.trigger(eventType.INVALID);
-        },
-
+        ///注册窗口或框架被重新调整大小事件；此事件只对window窗口起作用
         resize: function(fn) {
-            ///<summary>
-            ///给DOM树中元素注册窗口或框架被重新调整大小事件；此事件只对window窗口起作用
-            ///</summary>
-            ///<param name="fn" type="Function">事件函数</param>
-            ///<returns type="My"/>
-
-            return this.on(eventType.RESIZE, fn);
+            return arguments.length && this.on('resize', fn) || this.trigger('resize');
         },
 
+        ///页面或图片/脚本/文件/框架等加载完毕事件
         load: function(fn) {
-            ///<summary>
-            ///页面或图片/脚本/文件/框架等加载完毕事件
-            ///</summary>
-            ///<param name="fn" type="Function">事件函数</param>
-            ///<returns type="My"/>
-
-            return this.on(eventType.LOAD, fn);
+            return arguments.length && this.on('load', fn) || this.trigger('load');
         },
 
+        ///页面卸载/跳转/退出事件
         unload: function(fn) {
-            ///<summary>
-            ///页面卸载/跳转/退出事件
-            ///</summary>
-            ///<param name="fn" type="Function">事件函数</param>
-            ///<returns type="My"/>
-
-            return this.on(eventType.UNLOAD, fn);
+            return arguments.length && this.on('unload', fn) || this.trigger('unload');
         },
 
+        ///页面或图片/脚本/文件/框架等加载错误事件
         error: function(fn) {
-            ///<summary>
-            ///页面或图片/脚本/文件/框架等加载错误事件
-            ///</summary>
-            ///<param name="fn" type="Function">事件函数</param>
-            ///<returns type="My"/>
-
-            return this.on(eventType.ERROR, fn);
+            return arguments.length && this.on('error', fn) || this.trigger('error');
         },
 
-        globalclick: function(fn) {
-            ///<summary>
-            ///全文档点击事件，当点击在除DOM树中元素以外的任何元素上（被阻止冒泡的元素除外），就执行指定函数
-            ///&#10;此方法通常应用在点击页面时关闭/最小化浮动元素或弹出层
-            ///</summary>
-            ///<param name="fn" type="Function" optional="true">执行函数；可以不指定此函数，那么就默认执行关闭（隐藏）DOM树中各元素</param>
-            ///<returns type="My"/>
+        ///页面或图片/脚本/文件/框架等加载中断事件
+        abort: function(fn) {
+            return arguments.length && this.on('abort', fn) || this.trigger('abort');
+        },
 
+        /*
+         *全文档点击事件，当点击在除元素以外的任何元素上（被阻止冒泡的元素除外），就执行指定函数
+         *此方法通常应用在点击页面时关闭/最小化浮动元素或弹出层
+         *执行函数；可以不指定此函数，那么就默认执行关闭（隐藏）元素
+         */
+        globalclick: function(fn) {
             var scope = this;
-            M(document.body).click(function(e) {
+            M(window).click(function(e) {
                 e = e.target;
-                if (!scope.has(e) && !scope.find(e)[0]) {
-                    mfn.isFunction(fn) ? fn.call(scope, e) : scope.hide();
-                }
+                if (scope.has(e) || scope.find(e).length)
+                    return;
+
+                mfn.isFunction(fn) ? fn.call(scope, e) : scope.hide();
             });
             return this;
         },
 
-        setDrag: function(dragableParter, rect) {
-            ///<summary>
-            ///对DOM树中各元素（通常是弹出窗口）绑定拖拽动作，这样就可以用鼠标按住可拖拽部分（通常是弹出窗口标题），移动鼠标拖拽
-            ///</summary>
-            ///<param name="dragableParter" type="String|Element|My" optional="true">
-            ///可拖拽部分，可以是查询选择符，也可以是DOM元素对象，还可以是一个My对象；默认是当前绑定元素本身
-            ///</param>
-            ///<param name="rect" type="Object" optional="true">限制拖拽的矩形范围，格式如：{left:0,top:0,width:100,height:100}；默认无限制范围</param>
-            ///<returns type="My"/>
+        /*
+         *对元素（通常是弹出窗口）绑定拖拽动作，这样就可以用鼠标按住可拖拽部分（通常是弹出窗口标题），移动鼠标拖拽
+         *rect：限制拖拽的矩形范围，格式如：{left:0,top:0,width:100,height:100}；默认无限制范围
+         */
+        setDrag: function(dragabler, rect) {
+            var isS = mstring.isString(dragabler),
+                isE = !isS && base.isDomElement(dragabler),
+                isM = !isE && base.isMy(dragabler);
 
-            var isS = mstring.isString(dragableParter),
-                isE = dragableParter && base.isDomElement(dragableParter),
-                isM = base.isMy(dragableParter);
             if (isS || isE || isM) {
                 var $ = new _M_();
-                if (isE || isM) $.add(dragableParter);
-                else {
-                    this.each(function() {
-                        $.add(base.query(dragableParter, this));
-                    });
-                }
-                var pre, target;
-                var onmove = function(e) {
-                    var cur = {
-                        x: e.pageX,
-                        y: e.pageY
-                    };
-                    if (pre) {
-                        var w = target.outerWidth(),
-                            h = target.outerHeight();
-                        var pos = target.position();
-                        pos.left += cur.x - pre.x;
-                        pos.top += cur.y - pre.y;
-                        if (rect) {
-                            if (pos.left < rect.left) pos.left = 0;
-                            else if (pos.left + w > rect.width) pos.left = rect.width - w;
-                            if (pos.top < rect.top) pos.top = 0;
-                            else if (pos.top + h > rect.height) pos.top = rect.height - h;
+                (isE || isM) && $.add(dragabler) || this.each(function() {
+                    $.add(base.query(dragabler, this));
+                });
+
+                var pre = null,
+                    target = null,
+                    onmove = function(e) {
+                        var cur = {
+                            x: e.pageX,
+                            y: e.pageY
+                        };
+                        if (pre) {
+                            var w = target.outerWidth(),
+                                h = target.outerHeight(),
+                                pos = target.position();
+
+                            pos.left += cur.x - pre.x;
+                            pos.top += cur.y - pre.y;
+
+                            if (rect) {
+                                pos.left < rect.left && (pos.left = 0);
+                                pos.left + w > rect.width && (pos.left = rect.width - w);
+
+                                pos.top < rect.top && (pos.top = 0);
+                                pos.top + h > rect.height && (pos.top = rect.height - h);
+                            }
+
+                            target.position(pos);
                         }
-                        target.position(pos);
-                    }
-                    pre = cur;
-                }
-                var onup = function(e) {
-                    My(document.body).off(eventType.MOUSEMOVE, onmove).off(eventType.MOUSEUP, onup).off(eventType.MOUSELEAVE, onup);
-                    target = null;
-                    pre = null;
-                }
+                        pre = cur;
+                    }, onup = function(e) {
+                        My(document.body).off('mousemove', onmove).off('mouseup', onup).off('mouseleave', onup);
+                        target = null;
+                        pre = null;
+                    };
+
                 this.mousedown(function(e) {
-                    if ($.has(e.target) || $.find(e.target).length > 0) {
+                    if ($.has(e.target) || $.find(e.target).length) {
                         My(document.body).mousemove(onmove).mouseup(onup).mouseleave(onup);
                         pre = {
                             x: e.pageX,
@@ -3749,10 +3608,8 @@
             return this;
         },
 
+        ///验证用户输入，验证对象必须是input、textarea
         validate: function(regExp) {
-            ///<summary>验证用户输入，验证对象必须是input、textarea</summary>
-            ///<returns type="Boolean"/>
-
             var r = true;
             this.each(function() {
                 var v = this.value;
@@ -3771,23 +3628,20 @@
     function registerLoad(fn) {
         readyfns.push(fn);
         if (!isRegisterLoad) {
-            My.on(document, eventType.DOMCONTENTLOADED, completed);
-            My.on(window, eventType.LOAD, completed);
+            My.on(document, 'DOMContentLoaded', completed);
+            My.on(window, 'load', completed);
         }
         isRegisterLoad = true;
     }
 
     function completed() {
-        My.off(document, eventType.DOMCONTENTLOADED, completed);
-        My.off(window, eventType.LOAD, completed);
+        My.off(document, 'DOMContentLoaded', completed);
+        My.off(window, 'load', completed);
         My.isReady = true;
         marray.each(readyfns, function(fn) {
             fn.call(My);
         });
     }
-
-    base.plugin('Color', mcolor);
-
 
     function My(s, p) {
         return new _M_(s, p);
@@ -3805,7 +3659,7 @@
 
     base.augment(My, mstring, ['isString', 'ltrim', 'rtrim', 'trim', 'trimAll', 'camelCase', 'joinCase']);
     base.augment(My, mobject, ['isPlainObject']);
-    base.augment(My, marray, ['isArray', 'merge', 'sortOn', 'uniqueOn']);
+    base.augment(My, marray, ['isArray', 'isArrayLike', 'order', 'unique']);
     base.augment(My, mfn, ['isFunction']);
 
     window.M = window.My = My;
