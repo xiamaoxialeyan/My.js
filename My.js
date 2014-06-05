@@ -307,6 +307,7 @@
 
                 loader.url = url;
                 loader.dataType = opts.dataType || this.ajaxSettings.dataType;
+                loader.contentType = opts.contentType || this.ajaxSettings.contentType;
                 loader.parse = opts.parse === undefined ? this.ajaxSettings.parse : opts.parse;
                 loader.async = opts.async === undefined ? this.ajaxSettings.async : opts.async;
                 loader.cache = opts.cache === undefined ? this.ajaxSettings.cache : opts.cache;
@@ -331,50 +332,36 @@
                 })
 
                 loader.send();
-                return loader;
+                return {
+                    success: function(fn) {
+                        opts.success = fn;
+                    },
+                    fail: function(fn) {
+                        opts.fail = fn;
+                    },
+                    timeout: function(fn) {
+                        opts.ontimeout = fn;
+                    }
+                };
             },
 
-            getScript: function(url, callback) {
-                if (mstring.isString(url)) {
-                    var script = this.create('script').attr('type', 'text/javascript').error(function() {
-                        callback && callback.call(this, 'This script is loaded error!');
-                        script.release();
-                    });
-
-                    script[0].onload = script[0].onreadystatechange = function() {
-                        if (!this.readyState || (this.readyState && (this.readyState == 'loaded' || this.readyState == 'complete'))) {
-                            script[0].onload = script[0].onreadystatechange = null;
-                            callback && callback.call(this);
-                            script.release();
-                        }
-                    };
-
-                    script.attr('src', url);
-                    My('head').append(script);
-                } else if (marray.isArray(url)) {
-                    var count = 0,
-                        that = this,
-                        fails = [],
-                        fn = function(e) {
-                            e && fails.push(this.src);
-                            count++;
-                            count === url.length && callback && callback.call(that, fails);
-                        };
-                    marray.each(url, function(v) {
-                        base.getScript(v, fn);
-                    });
-                }
-            },
-
-            getCSS: function(url) {
+            require: function(url, callback) {
                 mstring.isString(url) && (url = [url]);
 
+                var count = 0,
+                    fails = [],
+                    cb = function(e) {
+                        e && fails.push(this.src || this.href);
+                        count++;
+                        count === url.length && callback && callback(fails);
+                    };
+
                 marray.each(url, function(v) {
-                    M('head').append(base.create('link').attr({
-                        rel: 'stylesheet',
-                        type: 'text/css',
-                        href: v
-                    }));
+                    if (!/\.(\w+)$/.test(v)) return;
+
+                    var ext = RegExp.$1;
+                    ext = ext.toLowerCase();
+                    ext === 'js' ? loadScript(v, cb) : (ext === 'css' ? loadCSS(v, cb) : null);
                 });
             },
 
@@ -2055,6 +2042,33 @@
         }, xss);
     }
 
+    function loadScript(url, callback) {
+        M('head').append(base.create('script').attr({
+            type: 'text/javascript',
+            src: url
+        }).load(function() {
+            callback && callback.call(this);
+            My(this).release();
+        }).error(function() {
+            callback && callback.call(this, 'This script file is loaded error!');
+            My(this).release();
+        }));
+    }
+
+    function loadCSS(url, callback) {
+        M('head').append(base.create('link').attr({
+            rel: 'stylesheet',
+            type: 'text/css',
+            href: url
+        }).load(function() {
+            callback && callback.call(this);
+            My(this).release();
+        }).error(function() {
+            callback && callback.call(this, 'This css file is loaded error!');
+            My(this).release();
+        }));
+    }
+
     ///cookie对象的一些操作方法
     var mcookie = {
         cookie: function(name, value, expires, path, domain, secure) {
@@ -2143,7 +2157,7 @@
     }
 
     ///_M_类原型，便以对DOM元素的操作，支持链式调用(一些取值器方法和逻辑判断方法除外)
-    _M_.prototype = {
+    base._ = _M_.prototype = {
         each: function(fn, arg) {
             if (mfn.isFunction(fn)) {
                 var i = 0,
@@ -3600,44 +3614,83 @@
         }
     };
 
-    ///数据提供者事件类型
-    mergeEvent([
-        ///添加数据项事件
-        'add',
-        ///删除数据项事件
-        'remove',
-        ///清空数据源事件
-        'clear',
-        ///数据源发生改变事件
-        'datachange',
-        ///刷新数据提供者事件
-        'refresh'
-    ]);
-
     ///数据提供者，监听数据的变化
     base.DataProvider = function(source) {
+        if (!(this instanceof base.DataProvider))
+            return new base.DataProvider(source);
 
+        base.Dispatcher.call(this);
+        marray.isArray(source) || (source = [source]);
+        this.__source = source;
     }
 
-    base.extend(base.DataProvider.prototype, {
+    base.inherit(base.DataProvider, base.Dispatcher, {
+        set: function(key, value) {
 
+        },
+
+        get: function(key) {
+
+        },
+
+        add: function() {
+
+        },
+
+        update: function() {
+
+        },
+
+        remove: function() {
+
+        },
+
+        clear: function() {
+            this.__source = [];
+            this.trigger('change');
+        }
     });
 
     ///数据模型
     base.Model = function(dataSource) {
+        if (!(this instanceof base.Model))
+            return new base.Model(dataSource);
 
+        base.Dispatcher.call(this);
+        dataSource instanceof base.DataProvider || (dataSource = new base.DataProvider(dataSource));
     }
 
-    base.extend(base.Model.prototype, {
+    base.inherit(base.Model, base.Dispatcher, {
+        set: function(key, value) {
 
+        },
+
+        get: function(key) {
+
+        },
+
+        ///从远程服务器获取数据，并刷新跟name或data-key关联起来的元素数据
+        ///mapKeys：绑定在元素上的key与数据中的key映射，若此两个key都一致，则没有必要再映射
+        fetch: function(mapKeys, callback) {
+
+        },
+
+        ///提交元素数据到远程服务器
+        ///mapKeys：绑定在元素上的key与数据中的key映射，若此两个key都一致，则没有必要再映射
+        commit: function(mapKeys, callback) {
+
+        }
     });
 
     ///UI视图
-    base.View = function() {
+    base.View = function(model) {
+        if (!(this instanceof base.View))
+            return new base.View(model);
 
+        base.Dispatcher.call(this);
     }
 
-    base.extend(base.View.prototype, {
+    base.inherit(base.View, base.Dispatcher, {
 
     });
 
@@ -3665,4 +3718,6 @@
     });
 
     base.extend(My, base);
+
+    console.log("*****************************************************\n***        **          **     ***     ***         ***\n***        ****      ****      ***   ***          ***\n***        ** ***  **** *       **  ***           ***\n***        **     *    **        * ***            ***\n***        **          **         ***             ***\n***        **          **        ***              ***\n***        **          **       ***               ***\n***        **          **      ***                ***\n*****************************************************\nWelcome to use My.js JavaScript Library!")
 })();
