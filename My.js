@@ -11,9 +11,21 @@
  ***********************************************************************************************
  */
 (function() {
-    var primitiveTypes = ['undefined', 'string', 'number', 'boolean'],
+    function My(s, p) {
+        return new _M_(s, p);
+    }
+
+    My.name = 'My';
+    My.version = '1.0.0';
+    My.isReady = false;
+    window.M = window.My = My;
+
+    var guidStr = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$',
+        primitiveTypes = ['undefined', 'string', 'number', 'boolean'],
         toString = Object.prototype.toString,
         slice = Array.prototype.slice,
+        loadRegisted = false,
+        readyfns = [],
 
         base = {
             isMy: function(obj) {
@@ -446,42 +458,25 @@
             guid: function() {
                 return '';
             }
-        },
+        };
 
-        guidStr = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$',
+    function registerLoad(fn) {
+        readyfns.push(fn);
+        if (!loadRegisted) {
+            base.on(window, 'load', completed);
+            base.on(document, 'DOMContentLoaded', completed);
+            loadRegisted = true;
+        }
+    }
 
-        ///IE下的一些属性名与W3C标准的映射
-        IEfix = {
-            acceptcharset: "acceptCharset",
-            accesskey: "accessKey",
-            allowtransparency: "allowTransparency",
-            bgcolor: "bgColor",
-            cellpadding: "cellPadding",
-            cellspacing: "cellSpacing",
-            "class": "className",
-            colspan: "colSpan",
-            checked: "defaultChecked",
-            selected: "defaultSelected",
-            "for": "htmlFor",
-            frameborder: "frameBorder",
-            hspace: "hSpace",
-            longdesc: "longDesc",
-            maxlength: "maxLength",
-            marginwidth: "marginWidth",
-            marginheight: "marginHeight",
-            noresize: "noResize",
-            noshade: "noShade",
-            readonly: "readOnly",
-            rowspan: "rowSpan",
-            tabindex: "tabIndex",
-            valign: "vAlign",
-            vspace: "vSpace"
-        },
-
-        testDiv = document.createElement('div');
-
-    testDiv.setAttribute('class', 't');
-    var supportSetAttr = testDiv.className === 't'; //检测是否可以支持setAttribute方法设置class
+    function completed() {
+        My.isReady = true;
+        base.off(window, 'load', completed);
+        base.off(document, 'DOMContentLoaded', completed);
+        marray.each(readyfns, function(fn) {
+            fn.call(My);
+        });
+    }
 
     ///String对象的一些操作方法
     var mstring = {
@@ -608,6 +603,7 @@
             return n < Math.pow(10, len - 1) ? mstring.repeat('0', len - n.toString().length) + n : n.toString();
         }
     };
+
 
     ///Object字面量(通过{}或new Object()创建)对象的一些操作方法
     var mobject = {
@@ -754,6 +750,7 @@
             return dest;
         }
     };
+
 
     ///Array对象的一些操作方法
     var marray = {
@@ -1081,6 +1078,7 @@
         }
     };
 
+
     ///函数的一些操作对象
     var mfn = {
         isFunction: function(fn) {
@@ -1092,6 +1090,14 @@
         }
     };
 
+    base.extend(base, mnumber);
+    base.extend(base, mdate);
+
+    base.augment(base, mstring, ['isString', 'ltrim', 'rtrim', 'trim', 'trimAll', 'camelCase', 'joinCase']);
+    base.augment(base, mobject, ['isPlainObject']);
+    base.augment(base, marray, ['isArray', 'isArrayLike', 'order', 'unique']);
+    base.augment(base, mfn, ['isFunction']);
+
     ///针对HTML内容的一些操作方法
     var mhtml = {
         encodeHTML: function(s) {
@@ -1102,6 +1108,8 @@
             return (s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ');
         }
     };
+
+    base.extend(base, mhtml);
 
     ///针对URL的一些操作方法
     var murl = {
@@ -1186,6 +1194,8 @@
             return url.replace(/(http[s]?:\/\/[^\s\[]+)/ig, '<a target="' + (target || '_blank') + '" href="$1">' + (text || url) + '</a>');
         }
     };
+
+    base.extend(base, murl);
 
     ///16进制颜色值
     var regHex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i,
@@ -1411,6 +1421,8 @@
 
     originalEventTypes = mouseEventTypes.concat(keyEventTypes, formEventTypes, domEventTypes);
     mergeEvent(originalEventTypes, customEventTypes);
+
+    base.eventType = eventType;
 
     function requestNewEvent(tg, ty, fn) {
         var guid = getEventGuid(tg);
@@ -1770,6 +1782,10 @@
         PARSE_ERROR: 4
     };
 
+    base.dataType = dataType;
+    base.contentType = contentType;
+    base.errorCode = errorCode;
+
     ///Ajax请求参数的全局设置，将会影响到所有的Ajax请求；当调用My.ajax()方法时，若有请求参数未被指定，则将会使用此全局设置中的请求参数
     base.ajaxSettings = {
         ///是否是JSONP请求，默认不是(false)
@@ -2068,51 +2084,7 @@
         }
     };
 
-    ///数据提供者事件类型
-    mergeEvent([
-        ///添加数据项事件
-        'add',
-        ///删除数据项事件
-        'remove',
-        ///清空数据源事件
-        'clear',
-        ///数据源发生改变事件
-        'datachange',
-        ///刷新数据提供者事件
-        'refresh'
-    ]);
-
-    ///数据模型，监听数据的变化，并及时更新数据源和UI视图
-    base.Model = function(source) {
-
-    }
-
-    base.extend(base.Model.prototype, {
-
-    });
-
-    ///UI模版
-    base.Template = function(data, template) {
-        this.data = data;
-        this.template = template;
-    }
-
-    base.extend(base.Template.prototype, {
-        execute: function() {
-            if (!this.data) return '';
-
-            var r, t = '',
-                s = '',
-                _ = this;
-            base.each(this.data, function(v) {
-                t = _.template;
-                while (r = /\{(\w+)\}/g.exec(t))
-                    t = t.replace(r[0], v[r[1]]);
-                s += t;
-            });
-            return s;
-        }
-    });
+    base.extend(base, mcookie);
 
     ///取得指定元素的上一个兄弟节点，兼容浏览器：排除TEXT节点
     function getPreviousSibling(e) {
@@ -2698,7 +2670,7 @@
                 var e = this[0];
                 if (e) {
                     fn = function(name) {
-                        return isPro ? (name === 'enabled' ? !e['disabled'] : e[name]) : e.getAttribute(supportSetAttr ? name : (IEfix[name] || name))
+                        return isPro ? (name === 'enabled' ? !e['disabled'] : e[name]) : e.getAttribute(name)
                     }
 
                     if (mstring.isString(name))
@@ -2727,7 +2699,7 @@
                         }
                         return;
                     }
-                    this.setAttribute(supportSetAttr ? n : (IEfix[n] || n), v);
+                    this.setAttribute(n, v);
                 })
             });
             return this;
@@ -2737,7 +2709,7 @@
             mstring.isString(name) && (name = [name]);
             marray.each.call(this, name, function(n) {
                 this.each(function() {
-                    this.removeAttribute(supportSetAttr ? n : (IEfix[n] || n));
+                    this.removeAttribute(n);
                 });
             });
             return this;
@@ -2772,9 +2744,16 @@
         },
 
         removeData: function(name) {
+            if (base.isEmpty(name)) {
+                this.each(function() {
+                    for (var k in this.dataset) this.removeAttribute('data-' + k);
+                });
+                return this;
+            }
+
             mstring.isString(name) && (name = [name]);
             marray.each.call(this, name, function(n) {
-                this.data(name, '');
+                this.removeAttr('data-' + n);
             });
             return this;
         },
@@ -3167,10 +3146,11 @@
 
         ///设置或检索DOM第一个元素的类样式
         ///当是设置，此方法将会覆盖元素先前指定的所有类样式
-        ///参数：类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'
+        ///参数：类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'，或是一个数组
         cls: function(cls) {
             if (cls === undefined) return this[0] && this[0].className ? this[0].className.replace(/\s+/, ' ').split(' ') : [];
 
+            marray.isArray(cls) && (cls = cls.join(' '));
             this.each(function() {
                 this.className = cls;
             });
@@ -3178,35 +3158,38 @@
         },
 
         ///添加类样式
-        ///参数：类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'
+        ///参数：类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'，或是一个数组
         addClass: function(cls) {
-            if (mstring.isString(cls)) {
-                cls = cls.split(' ');
-                this.each(function() {
-                    marray.each.call(this, cls, function(c) {
-                        My(this).hasClass(c) || (this.className += (this.className ? ' ' : '') + c);
-                    });
+            mstring.isString(cls) && (cls = cls.split(' '));
+            this.each(function() {
+                marray.each.call(this, cls, function(c) {
+                    My(this).hasClass(c) || (this.className += (this.className ? ' ' : '') + c);
                 });
-            }
+            });
             return this;
         },
 
         ///删除类样式
-        ///参数：类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'
+        ///参数：类样式名，可以是多个连续类名，用一个空格分隔，如'class1 class2'，或是一个数组
         removeClass: function(cls) {
-            if (mstring.isString(cls)) {
-                cls = cls.split(' ');
+            if (base.isEmpty(cls)) {
                 this.each(function() {
-                    var cs = this.className && this.className.replace(/\s+/, ' ').split(' ') || [];
-                    if (cs.length) {
-                        marray.each(cls, function(c) {
-                            var j = cs.indexOf(c);
-                            j > -1 && cs.splice(j, 1);
-                        });
-                        this.className = cs.join(' ');
-                    }
+                    this.className = '';
                 });
+                return this;
             }
+
+            mstring.isString(cls) && (cls = cls.split(' '));
+            this.each(function() {
+                var cs = this.className && this.className.replace(/\s+/, ' ').split(' ') || [];
+                if (cs.length) {
+                    marray.each(cls, function(c) {
+                        var j = cs.indexOf(c);
+                        j > -1 && cs.splice(j, 1);
+                    });
+                    this.className = cs.join(' ');
+                }
+            });
             return this;
         },
 
@@ -3287,6 +3270,13 @@
         ///删除样式(删除设置在style属性上的样式)
         ///样式名(font-size/fontSize形式都可)，可以是字符串，如color、backgroud等;也可以是一个数组，表示多个样式，[name1,name2,name3,...]
         removeStyle: function(name) {
+            if (base.isEmpty(name)) {
+                this.each(function() {
+                    this.style.cssText = '';
+                });
+                return this;
+            }
+
             mstring.isString(name) && (name = [name]);
             this.each(function() {
                 var so = this.style.cssText.split(';');
@@ -3306,14 +3296,6 @@
                     });
                     this.style.cssText = so.join(';');
                 }
-            });
-            return this;
-        },
-
-        ///清空元素的样式 (清空设置在style属性上的样式)
-        clearStyle: function() {
-            this.each(function() {
-                this.style.cssText = '';
             });
             return this;
         },
@@ -3564,6 +3546,7 @@
 
                 var pre = null,
                     target = null,
+                    mothed = null,
                     onmove = function(e) {
                         var cur = {
                             x: e.pageX,
@@ -3572,20 +3555,20 @@
                         if (pre) {
                             var w = target.outerWidth(),
                                 h = target.outerHeight(),
-                                pos = target.position();
+                                p = target[mothed]();
 
-                            pos.left += cur.x - pre.x;
-                            pos.top += cur.y - pre.y;
+                            p.left += cur.x - pre.x;
+                            p.top += cur.y - pre.y;
 
                             if (rect) {
-                                pos.left < rect.left && (pos.left = 0);
-                                pos.left + w > rect.width && (pos.left = rect.width - w);
+                                p.left < rect.left && (p.left = 0);
+                                p.left + w > rect.width && (p.left = rect.width - w);
 
-                                pos.top < rect.top && (pos.top = 0);
-                                pos.top + h > rect.height && (pos.top = rect.height - h);
+                                p.top < rect.top && (p.top = 0);
+                                p.top + h > rect.height && (p.top = rect.height - h);
                             }
 
-                            target.position(pos);
+                            target[mothed](p);
                         }
                         pre = cur;
                     }, onup = function(e) {
@@ -3602,6 +3585,7 @@
                             y: e.pageY
                         };
                         target = My(this);
+                        mothed = target.parent().style('position') === 'static' && 'position' || 'offset';
                     }
                 });
             }
@@ -3610,58 +3594,58 @@
 
         ///验证用户输入，验证对象必须是input、textarea
         validate: function(regExp) {
-            var r = true;
-            this.each(function() {
-                var v = this.value;
-                if (v && !regExp.test(v)) {
-                    r = false;
-                    return false;
-                }
+            return this.each(function() {
+                return regExp.test(this.value);
             });
-            return r;
         }
     };
 
-    var isRegisterLoad = false,
-        readyfns = [];
+    base.extend(My, base);
 
-    function registerLoad(fn) {
-        readyfns.push(fn);
-        if (!isRegisterLoad) {
-            My.on(document, 'DOMContentLoaded', completed);
-            My.on(window, 'load', completed);
+    ///数据提供者事件类型
+    mergeEvent([
+        ///添加数据项事件
+        'add',
+        ///删除数据项事件
+        'remove',
+        ///清空数据源事件
+        'clear',
+        ///数据源发生改变事件
+        'datachange',
+        ///刷新数据提供者事件
+        'refresh'
+    ]);
+
+    ///数据模型，监听数据的变化，并及时更新数据源和UI视图
+    base.Model = function(source) {
+
+    }
+
+    base.extend(base.Model.prototype, {
+
+    });
+
+    ///UI模版
+    base.Template = function(data, template) {
+        this.data = data;
+        this.template = template;
+    }
+
+    base.extend(base.Template.prototype, {
+        execute: function() {
+            if (!this.data) return '';
+
+            var r, t = '',
+                s = '',
+                _ = this;
+            base.each(this.data, function(v) {
+                t = _.template;
+                while (r = /\{(\w+)\}/g.exec(t))
+                    t = t.replace(r[0], v[r[1]]);
+                s += t;
+            });
+            return s;
         }
-        isRegisterLoad = true;
-    }
-
-    function completed() {
-        My.off(document, 'DOMContentLoaded', completed);
-        My.off(window, 'load', completed);
-        My.isReady = true;
-        marray.each(readyfns, function(fn) {
-            fn.call(My);
-        });
-    }
-
-    function My(s, p) {
-        return new _M_(s, p);
-    }
-
-    base.extend(My, base, {
-        name: 'My',
-        version: '1.0.0',
-        isReady: false,
-        eventType: eventType,
-        dataType: dataType,
-        contentType: contentType,
-        errorCode: errorCode
-    }, mnumber, mdate, mcookie, mhtml, murl);
-
-    base.augment(My, mstring, ['isString', 'ltrim', 'rtrim', 'trim', 'trimAll', 'camelCase', 'joinCase']);
-    base.augment(My, mobject, ['isPlainObject']);
-    base.augment(My, marray, ['isArray', 'isArrayLike', 'order', 'unique']);
-    base.augment(My, mfn, ['isFunction']);
-
-    window.M = window.My = My;
+    });
 
 })();

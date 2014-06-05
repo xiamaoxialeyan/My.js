@@ -4,9 +4,14 @@
     <script src="My.js"></script>
   </head>
   <body>
-    <a>aaaaaaaaaa</a>
+    <div style="background:black;width:800px;height:500px;">
+        <div id="block" style="background:red;width:100px;height:100px;">
+            <p style="background:gray;cursor:pointer;margin:0">===========</p>
+        </div>   
+    </div>  
+    <a data-a="a" data-b="b" data-c="c">ddd</a>  
   </body>
   <script type="text/javascript">
-    
+    M('#block').setDrag(M('p'),{left:0,top:0,width:800,height:500});
   </script>
 </html>
