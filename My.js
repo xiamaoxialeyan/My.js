@@ -3600,8 +3600,6 @@
         }
     };
 
-    base.extend(My, base);
-
     ///数据提供者事件类型
     mergeEvent([
         ///添加数据项事件
@@ -3616,8 +3614,17 @@
         'refresh'
     ]);
 
-    ///数据模型，监听数据的变化，并及时更新数据源和UI视图
-    base.Model = function(source) {
+    ///数据提供者，监听数据的变化
+    base.DataProvider = function(source) {
+
+    }
+
+    base.extend(base.DataProvider.prototype, {
+
+    });
+
+    ///数据模型
+    base.Model = function(dataSource) {
 
     }
 
@@ -3625,7 +3632,16 @@
 
     });
 
-    ///UI模版
+    ///UI视图
+    base.View = function() {
+
+    }
+
+    base.extend(base.View.prototype, {
+
+    });
+
+    ///UI模板
     base.Template = function(data, template) {
         this.data = data;
         this.template = template;
@@ -3648,4 +3664,5 @@
         }
     });
 
+    base.extend(My, base);
 })();
