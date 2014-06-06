@@ -3660,29 +3660,149 @@
     }
 
     base.inherit(base.DataProvider, base.Dispatcher, {
-        set: function(key, value) {
-
-        },
-
+        ///取值：get(1)->[0,1]或get("key")->{key:xxx}或get("1.key")->[{key:xxx}]或get("item.key")->{item:{key:xxx}}
         get: function(key) {
+            if (mnumber.isNumber(key))
+                return this.__source[key];
 
+            if (!mstring.isString(key))
+                return null;
+
+            key = key.split('.');
+            mnumber.isNumeric(key[0]) || (key.unshift('0'));
+
+            for (var i = 0, l = key.length, d = this.__source; i < l; i++)
+                d = d[key[i]];
+            return d;
         },
 
-        add: function() {
+        ///设值，参数key同get方法
+        set: function(key, value) {
+            if (mnumber.isNumber(key)) {
+                var o = this.__source[key];
+                if (o !== value) {
+                    this.__source[key] = value;
+                    this.trigger('change:' + key);
+                    this.trigger('change');
+                }
+                return this;
+            }
 
+            var iss = mstring.isString(key),
+                iso = !iss && mobject.isPlainObject(key);
+
+            if (!iss && !iso)
+                return this;
+
+            var keys = key;
+            iss && (keys = {}, keys[key] = value);
+            mobject.each.call(this, keys, function(v, k) {
+                var ks = k.split('.'),
+                    i = 0,
+                    l = 0,
+                    d = this.__source;
+                mnumber.isNumeric(ks[0]) || (ks.unshift('0'));
+                l = ks.length;
+
+                for (; i < l - 1; i++)
+                    d = d[ks[i]];
+
+                var o = d[ks[l - 1]];
+                if (o !== value) {
+                    d[ks[l - 1]] = value;
+                    this.trigger('change:' + k);
+                    this.trigger('change');
+                }
+            });
+            return this;
         },
 
-        update: function() {
+        ///取消指定字段
+        unset: function(key) {
+            if (mnumber.isNumber(key)) {
+                this.__source.splice(key, 1);
+                this.trigger('unset', key);
+                return this;
+            }
 
+            if (!mstring.isString(key))
+                return this;
+
+            var ks = key.split('.'),
+                i = 0,
+                l = 0,
+                d = this.__source;
+            mnumber.isNumeric(ks[0]) || (ks.unshift('0'));
+            l = ks.length;
+
+            for (; i < l - 1; i++)
+                d = d[ks[i]];
+            marray.isArray(d) ? d.splice(ks[l - 1], 1) : (delete d[ks[l - 1]]);
+            this.trigger('unset', key);
+            return this;
         },
 
-        remove: function() {
+        index: function(item) {
+            var dx = -1;
+            marray.each(this.__source, function(v, i) {
+                if (v === item) {
+                    dx = i;
+                    return false;
+                }
+            });
+            return dx;
+        },
 
+        contains: function(item) {
+            return this.index(item) > -1;
+        },
+
+        getItem: function(index) {
+            if (index < 0 || index >= this.__source.length)
+                return null;
+            return this.__source[index];
+        },
+
+        add: function(item) {
+            if (!mobject.isPlainObject(item))
+                return this;
+
+            this.__source.push(item);
+            this.trigger('add', item);
+            return this;
+        },
+
+        update: function(index, item) {
+            var old = this.getItem(index);
+            if (!old) return this.add(item);
+
+            this.__source[index] = item;
+            this.trigger('update', [item, old]);
+            return this;
+        },
+
+        remove: function(item) {
+            var index = this.index(item);
+            if (index == -1) return this;
+
+            this.__source.splice(index, 1);
+            this.trigger('remove', [index, item]);
+            return this;
+        },
+
+        removeAt: function(index) {
+            var old = this.getItem(index);
+            if (!old) return this;
+
+            this.__source.splice(index, 1);
+            this.trigger('remove', [index, old]);
+            return this;
         },
 
         clear: function() {
             this.__source = [];
-            this.trigger('change');
+            this.trigger('clear');
+            return this;
         }
     });
 
@@ -3693,6 +3813,8 @@
 
         base.Dispatcher.call(this);
         dataSource instanceof base.DataProvider || (dataSource = new base.DataProvider(dataSource));
+        this.dataSource = dataSource;
+        this.url = '';
     }
 
     base.inherit(base.Model, base.Dispatcher, {
@@ -3713,6 +3835,10 @@
         ///提交元素数据到远程服务器
         ///mapKeys：绑定在元素上的key与数据中的key映射，若此两个key都一致，则没有必要再映射
         commit: function(mapKeys, callback) {
+
+        },
+
+        destroy: function() {
 
         }
     });

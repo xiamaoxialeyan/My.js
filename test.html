@@ -8,6 +8,14 @@
   	
   </body>
   <script type="text/javascript">
-  
+  	var provider = new My.DataProvider([[1,2,3]]);
+  	provider.on({
+  	    'change:0': function() {
+  	        debugger
+  	    },
+  	    'unset':function(evt){
+			debugger
+  	    }
+  	});
   </script>
 </html>
