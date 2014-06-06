@@ -5,8 +5,20 @@
     <script src="My.js"></script>
   </head>
   <body>
+  	<div title="{{title}}">
+  		<a>{{name}}</a>
+  		<a>{{last}}</a>
+  	</div>
+  	<div title="{{title}}">
+  		<a>{{name}}</a>
+  		<a>{{last}}</a>
+  	</div>
+  	<button>Fetch</button>
   </body>
-  <script type="text/javascript">    
-    
+  <script type="text/javascript">
+  var m=M('div').ajaxSet({url:'test.json'});
+	M('button').click(function(){
+		m.fetch();
+	});
   </script>
 </html>

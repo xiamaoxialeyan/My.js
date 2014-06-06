@@ -335,12 +335,15 @@
                 return {
                     success: function(fn) {
                         opts.success = fn;
+                        return this;
                     },
                     fail: function(fn) {
                         opts.fail = fn;
+                        return this;
                     },
                     timeout: function(fn) {
                         opts.ontimeout = fn;
+                        return this;
                     }
                 };
             },
@@ -412,6 +415,23 @@
                     xml = null;
                 }
                 return xml;
+            },
+
+            parseHTML: function(data) {
+                if (!mstring.isString(data))
+                    return null;
+
+                var dom;
+                try {
+                    if (window.DOMParser) { // W3C标准
+                        var parser = new DOMParser();
+                        dom = parser.parseFromString(data, "text/html");
+                        dom && (dom = dom.body.children || dom.body.childNodes);
+                    }
+                } catch (e) {
+                    dom = null;
+                }
+                return new _M_(dom);
             },
 
             on: function(tg, ty, fn, arg) {
@@ -2469,14 +2489,16 @@
         replace: function(target) {
             var cc = [];
             if (target) {
+                mstring.isString(target) && (target = base.parseHTML(target));
                 base.isDomElement(target) && (target = My(target));
                 if (base.isMy(target)) {
                     this.each(function(i) {
                         var $ = i && target.clone(true) || target,
-                            _ = this;
-                        $.reach(function() {
-                            var f = _.parentNode.replaceChild(this, _);
-                            f && cc.push(f);
+                            _ = this,
+                            p = this.parentNode;
+                        p && $.reach(function() {
+                            var f = p.replaceChild(this, _);
+                            f && (cc.push(f));
                         });
                     });
                 }
@@ -2605,6 +2627,7 @@
             return new _M_(cc);
         },
 
+        ///innerHTML
         html: function(h) {
             if (h === undefined) {
                 var e = this[0];
@@ -2615,6 +2638,18 @@
             this.each(function() {
                 base.isDefined(this.innerHTML) && (this.innerHTML = h);
             });
+            return this;
+        },
+
+        ///outerHTML
+        ohtml: function(h) {
+            if (h === undefined) {
+                var e = this[0];
+                return e && e.outerHTML || '';
+            }
+
+            h instanceof base.Template && (h = h.execute());
+            this.replace(h);
             return this;
         },
 
@@ -3611,6 +3646,56 @@
             return this.each(function() {
                 return regExp.test(this.value);
             });
+        },
+
+        /*
+         *设置元素与服务器交互数据的一些参数
+         *ajaxSettings:{url,map}
+         */
+        ajaxSet: function(opts) {
+            base.extend(this.ajaxSettings || (this.ajaxSettings = {}), opts || {});
+            this.ajaxSettings.tpl || (this.ajaxSettings.tpl = this[0].outerHTML);
+            this.ajaxData = null;
+            return this;
+        },
+
+        ///从远程服务器获取数据(JSON)，并填充到元素中，这是一个简单方法，若有复杂数据结构或组件，适合使用Model与View
+        fetch: function(cb) {
+            if (!this.ajaxSettings || !this.ajaxSettings.url || !this.length) return this;
+
+            var _ = this;
+            base.ajax(this.ajaxSettings.url, {
+                dataType: 'json'
+            }).success(function(data) {
+                var pd = data;
+                if (_.ajaxSettings.map) {
+                    pd = {};
+                    mobject.each(_.ajaxSettings.map, function(dk, k) {
+                        pd[k] = data[dk];
+                    });
+                }
+                _.ajaxData = pd;
+
+                var s = _.ajaxSettings.tpl.replace(/({{(\w+)}})/g, function(m, p, f) {
+                    return pd[f];
+                });
+                _.each(function(i) {
+                    var t = base.parseHTML(s)[0];
+                    this.parentNode.replaceChild(t, this);
+                    _[i] = t;
+                });
+            }).fail(function() {
+                cb && cb.call(_, "fail to fetch the element");
+            });
+            return this;
+        },
+
+        ///提交元素数据(JSON)到远程服务器(只对第一个元素有效)，这是一个简单方法，若有复杂数据结构或组件，适合使用Model与View
+        commit: function(cb) {
+            if (!this.ajaxSettings || !this.ajaxSettings.url || !this.length || !this.ajaxData) return this;
+
+            var data = this.ajaxData;
+            return this;
         }
     };
 
