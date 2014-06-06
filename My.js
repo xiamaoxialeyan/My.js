@@ -3646,56 +3646,6 @@
             return this.each(function() {
                 return regExp.test(this.value);
             });
-        },
-
-        /*
-         *设置元素与服务器交互数据的一些参数
-         *ajaxSettings:{url,map}
-         */
-        ajaxSet: function(opts) {
-            base.extend(this.ajaxSettings || (this.ajaxSettings = {}), opts || {});
-            this.ajaxSettings.tpl || (this.ajaxSettings.tpl = this[0].outerHTML);
-            this.ajaxData = null;
-            return this;
-        },
-
-        ///从远程服务器获取数据(JSON)，并填充到元素中，这是一个简单方法，若有复杂数据结构或组件，适合使用Model与View
-        fetch: function(cb) {
-            if (!this.ajaxSettings || !this.ajaxSettings.url || !this.length) return this;
-
-            var _ = this;
-            base.ajax(this.ajaxSettings.url, {
-                dataType: 'json'
-            }).success(function(data) {
-                var pd = data;
-                if (_.ajaxSettings.map) {
-                    pd = {};
-                    mobject.each(_.ajaxSettings.map, function(dk, k) {
-                        pd[k] = data[dk];
-                    });
-                }
-                _.ajaxData = pd;
-
-                var s = _.ajaxSettings.tpl.replace(/({{(\w+)}})/g, function(m, p, f) {
-                    return pd[f];
-                });
-                _.each(function(i) {
-                    var t = base.parseHTML(s)[0];
-                    this.parentNode.replaceChild(t, this);
-                    _[i] = t;
-                });
-            }).fail(function() {
-                cb && cb.call(_, "fail to fetch the element");
-            });
-            return this;
-        },
-
-        ///提交元素数据(JSON)到远程服务器(只对第一个元素有效)，这是一个简单方法，若有复杂数据结构或组件，适合使用Model与View
-        commit: function(cb) {
-            if (!this.ajaxSettings || !this.ajaxSettings.url || !this.length || !this.ajaxData) return this;
-
-            var data = this.ajaxData;
-            return this;
         }
     };
 

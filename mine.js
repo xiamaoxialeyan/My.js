@@ -16,5 +16,6 @@ exports.types = {
     "wav": "audio/x-wav",
     "wma": "audio/x-ms-wma",
     "wmv": "video/x-ms-wmv",
-    "xml": "text/xml"
+    "xml": "text/xml",
+    "binary": "application/octet-stream"
 };
