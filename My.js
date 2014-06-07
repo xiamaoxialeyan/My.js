@@ -3803,6 +3803,10 @@
             this.__source = [];
             this.trigger('clear');
             return this;
+        },
+
+        toSource: function() {
+            return marray.clone(this.__source, true);
         }
     });
 
@@ -3813,28 +3817,48 @@
 
         base.Dispatcher.call(this);
         dataSource instanceof base.DataProvider || (dataSource = new base.DataProvider(dataSource));
-        this.dataSource = dataSource;
+        this.provider = dataSource;
         this.url = '';
+        this.initialize();
     }
 
     base.inherit(base.Model, base.Dispatcher, {
-        set: function(key, value) {
-
-        },
+        initialize: function() {},
 
         get: function(key) {
+            return this.provider.get(key);
+        },
 
+        set: function(key, value) {
+            this.provider.set(key, value);
+            return this;
+        },
+
+        unset: function(key) {
+            this.provider.unset(key);
+            return this;
+        },
+
+        has: function(key) {
+            return base.isDefined(this.get(key));
+        },
+
+        clear: function() {
+            this.provider.clear();
+            return this;
+        },
+
+        toSource: function() {
+            return this.provider.toSource();
         },
 
         ///从远程服务器获取数据，并刷新跟name或data-key关联起来的元素数据
-        ///mapKeys：绑定在元素上的key与数据中的key映射，若此两个key都一致，则没有必要再映射
-        fetch: function(mapKeys, callback) {
+        fetch: function(callback) {
 
         },
 
         ///提交元素数据到远程服务器
-        ///mapKeys：绑定在元素上的key与数据中的key映射，若此两个key都一致，则没有必要再映射
-        commit: function(mapKeys, callback) {
+        commit: function(callback) {
 
         },
 
