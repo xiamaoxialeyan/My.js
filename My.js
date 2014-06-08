@@ -3742,61 +3742,8 @@
             return this;
         },
 
-        index: function(item) {
-            var dx = -1;
-            marray.each(this.__source, function(v, i) {
-                if (v === item) {
-                    dx = i;
-                    return false;
-                }
-            });
-            return dx;
-        },
-
-        contains: function(item) {
-            return this.index(item) > -1;
-        },
-
-        getItem: function(index) {
-            if (index < 0 || index >= this.__source.length)
-                return null;
-            return this.__source[index];
-        },
-
-        add: function(item) {
-            if (!mobject.isPlainObject(item))
-                return this;
-
-            this.__source.push(item);
-            this.trigger('add', item);
-            return this;
-        },
-
-        update: function(index, item) {
-            var old = this.getItem(index);
-            if (!old) return this.add(item);
-
-            this.__source[index] = item;
-            this.trigger('update', [item, old]);
-            return this;
-        },
-
-        remove: function(item) {
-            var index = this.index(item);
-            if (index == -1) return this;
-
-            this.__source.splice(index, 1);
-            this.trigger('remove', [index, item]);
-            return this;
-        },
-
-        removeAt: function(index) {
-            var old = this.getItem(index);
-            if (!old) return this;
-
-            this.__source.splice(index, 1);
-            this.trigger('remove', [index, old]);
-            return this;
+        has: function(key) {
+            return base.isDefined(this.get(key));
         },
 
         clear: function() {
@@ -3840,7 +3787,7 @@
         },
 
         has: function(key) {
-            return base.isDefined(this.get(key));
+            return this.provider.has(key);
         },
 
         clear: function() {
