@@ -362,7 +362,7 @@
 
                 marray.each(url, function(v) {
                     var ext = {
-                        scprit: 'js',
+                        script: 'js',
                         css: 'css'
                     }[type] || null;
 
