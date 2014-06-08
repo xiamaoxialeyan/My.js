@@ -348,7 +348,8 @@
                 };
             },
 
-            require: function(url, callback) {
+            require: function(url, type, callback) {
+                mfn.isFunction(type) && (callback = type);
                 mstring.isString(url) && (url = [url]);
 
                 var count = 0,
@@ -360,10 +361,17 @@
                     };
 
                 marray.each(url, function(v) {
-                    if (!/\.(\w+)$/.test(v)) return;
+                    var ext = {
+                        scprit: 'js',
+                        css: 'css'
+                    }[type] || null;
 
-                    var ext = RegExp.$1;
-                    ext = ext.toLowerCase();
+                    if (!ext) {
+                        if (!/\.(\w+)$/.test(v)) return;
+                        ext = RegExp.$1;
+                        ext = ext.toLowerCase();
+                    }
+
                     ext === 'js' ? loadScript(v, cb) : (ext === 'css' ? loadCSS(v, cb) : null);
                 });
             },
