@@ -33,7 +33,7 @@
             },
 
             isDefined: function(value) {
-                return typeof value !== 'undefined';
+                return !this.isUndefined(value);
             },
 
             isUndefined: function(value) {
@@ -109,10 +109,13 @@
             },
 
             isEmpty: function(a) {
+                if (this.isMy(a))
+                    return a.isEmpty();
+
                 if (mstring.isString(a))
                     return mstring.isEmpty(a);
 
-                if (marray.isArray(a))
+                if (marray.isArray(a) || marray.isArrayLike(a))
                     return marray.isEmpty(a);
 
                 if (mobject.isPlainObject(a))
@@ -122,7 +125,7 @@
             },
 
             size: function(a) {
-                if (mstring.isString(a) || marray.isArray(a))
+                if (this.isMy(a) || mstring.isString(a) || marray.isArray(a) || marray.isArrayLike(a))
                     return a.length;
 
                 if (mobject.isPlainObject(a))
@@ -140,7 +143,8 @@
                     'boolean': false,
                     'object': {},
                     'array': [],
-                    'function': function() {}
+                    'function': function() {},
+                    'my': new _M_()
                 }[type || 'object'];
             },
 
@@ -199,10 +203,10 @@
             range: function(first, second, step, type) {
                 type = type || 'array';
 
-                if (type == 'array')
+                if (type === 'array')
                     return marray.range(first, second, step);
 
-                if (type == 'string')
+                if (type === 'string')
                     return mstring.range(first, second, step);
 
                 return null;
@@ -240,9 +244,7 @@
 
                 subCls.prototype = prot;
                 subCls.superCls = superCls.prototype;
-
-                if (superCls.prototype.constructor === Object.prototype.constructor)
-                    superCls.prototype.constructor = superCls;
+                superCls.prototype.constructor === Object.prototype.constructor && (superCls.prototype.constructor = superCls);
                 return this;
             },
 
@@ -314,17 +316,17 @@
                 loader.timeout = opts.timeout === undefined ? this.ajaxSettings.timeout : opts.timeout;
 
                 loader.once({
-                    'success': function(e) {
+                    success: function(e) {
                         opts.success && opts.success.call(this, this.data);
                         this.release();
                         loader = null;
                     },
-                    'fail': function(e, x) {
+                    fail: function(e, x) {
                         opts.fail && opts.fail.call(this, this, e, x);
                         this.release();
                         loader = null;
                     },
-                    'timeout': function() {
+                    timeout: function() {
                         opts.ontimeout && opts.ontimeout.call(this);
                         this.release();
                         loader = null;
@@ -386,43 +388,30 @@
             parse: function(data, type) {
                 return {
                     json: JSON.parse(data),
-                    xml: this.parseXML(data)
+                    xml: this.parseXML(data),
+                    html: this.parseHTML(data)
                 }[type || 'json'];
             },
 
             serializeXML: function(xml) {
-                var txt = '';
                 try {
-                    if (window.XMLSerializer) { // W3C标准
-                        var serializer = new XMLSerializer();
-                        txt = serializer.serializeToString(xml);
-                    } else { //IE
-                        txt = xml.xml;
-                    }
+                    var serializer = new XMLSerializer();
+                    return serializer.serializeToString(xml);
                 } catch (e) {
-                    txt = '';
+                    return '';
                 }
-                return txt;
             },
 
             parseXML: function(data) {
                 if (!mstring.isString(data))
                     return null;
 
-                var xml;
                 try {
-                    if (window.DOMParser) { // W3C标准
-                        var parser = new DOMParser();
-                        xml = parser.parseFromString(data, "text/xml");
-                    } else { //IE
-                        xml = new ActiveXObject("Microsoft.XMLDOM");
-                        xml.async = "false";
-                        xml.loadXML(data);
-                    }
+                    var parser = new DOMParser();
+                    return parser.parseFromString(data, "text/xml");
                 } catch (e) {
-                    xml = null;
+                    return null;
                 }
-                return xml;
             },
 
             parseHTML: function(data) {
@@ -431,11 +420,9 @@
 
                 var dom;
                 try {
-                    if (window.DOMParser) { // W3C标准
-                        var parser = new DOMParser();
-                        dom = parser.parseFromString(data, "text/html");
-                        dom && (dom = dom.body.children || dom.body.childNodes);
-                    }
+                    var parser = new DOMParser();
+                    dom = parser.parseFromString(data, "text/html");
+                    dom && (dom = dom.body.children || dom.body.childNodes);
                 } catch (e) {
                     dom = null;
                 }
@@ -2217,6 +2204,10 @@
                 }
             }
             return this;
+        },
+
+        isEmpty: function() {
+            return this.length === 0;
         },
 
         ///检索所有元素
