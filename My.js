@@ -857,28 +857,28 @@
             return arr.concat();
         },
 
+        ///each(array,function[,start][,end][,arg][,context])、each(array,function[,start][,arg][,context])、each(array,function[,arg][,context])
         each: function(arr, fn) {
             if (!mfn.isFunction(fn))
                 return false;
 
-            var s = 0,
-                e = arr.length,
-                c = this,
-                arg, v;
+            var start = 0,
+                end = arr.length,
+                v, arg, context;
 
             if (arguments.length > 2) {
-                var t = arguments[2],
-                    f = arguments[3],
-                    z = arguments[4],
-                    x = arguments[5];
-                base.isDefined(t) && (mnumber.isNumber(t) && (s = t) || (arg = t, c = f));
-                base.isDefined(f) && (mnumber.isNumber(f) && (e = f) || (arg = f, c = z));
-                base.isDefined(z) && (arg = z);
-                base.isDefined(x) && (c = x);
+                var a2 = arguments[2],
+                    a3 = arguments[3],
+                    a4 = arguments[4],
+                    a5 = arguments[5];
+                base.isDefined(a5) && (context = a5);
+                base.isDefined(a4) && (arg = a4);
+                base.isDefined(a3) && (mnumber.isNumber(a3) && (end = a3) || (arg = a3, context = a4));
+                base.isDefined(a2) && (mnumber.isNumber(a2) && (start = a2) || (arg = a2, context = a3));
             }
 
-            for (; s < e; s++) {
-                v = fn.call(c, arr[s], s, arg);
+            for (; start < end; start++) {
+                v = fn.call(context || this, arr[start], start, arg);
 
                 if (v === false)
                     break;
@@ -891,24 +891,23 @@
             if (!mfn.isFunction(fn))
                 return false;
 
-            var s = arr.length - 1,
-                e = 0,
-                c = this,
-                arg, v;
+            var start = arr.length - 1,
+                end = 0,
+                v, arg, context;
 
             if (arguments.length > 2) {
-                var t = arguments[2],
-                    f = arguments[3],
-                    z = arguments[4],
-                    x = arguments[5];
-                base.isDefined(t) && (mnumber.isNumber(t) && (s = t) || (arg = t, c = f));
-                base.isDefined(f) && (mnumber.isNumber(f) && (e = f) || (arg = f, c = z));
-                base.isDefined(z) && (arg = z);
-                base.isDefined(x) && (c = x);
+                var a2 = arguments[2],
+                    a3 = arguments[3],
+                    a4 = arguments[4],
+                    a5 = arguments[5];
+                base.isDefined(a5) && (context = a5);
+                base.isDefined(a4) && (arg = a4);
+                base.isDefined(a3) && (mnumber.isNumber(a3) && (end = a3) || (arg = a3, context = a4));
+                base.isDefined(a2) && (mnumber.isNumber(a2) && (start = a2) || (arg = a2, context = a3));
             }
 
-            for (; s >= e; s--) {
-                v = fn.call(c, arr[s], s, arg);
+            for (; start >= end; start--) {
+                v = fn.call(context || this, arr[s], start, arg);
 
                 if (v === false)
                     break;
@@ -3654,11 +3653,15 @@
             return new base.DataProvider(source);
 
         base.Dispatcher.call(this);
-        marray.isArray(source) || (source = [source]);
-        this.__source = source;
+        this.__source = marray.isArray(source) && source || [source];
     }
 
     base.inherit(base.DataProvider, base.Dispatcher, {
+        owner: function(o) {
+            this.__owner = o;
+            return this;
+        },
+
         ///取值：get(1)->[0,1]或get("key")->{key:xxx}或get("1.key")->[{key:xxx}]或get("item.key")->{item:{key:xxx}}
         get: function(key) {
             if (mnumber.isNumber(key))
@@ -3675,14 +3678,22 @@
             return d;
         },
 
-        ///设值，参数key同get方法
+        ///设值，参数key同get方法，派发change事件
         set: function(key, value) {
+            function trigger(obj, key) {
+                obj.trigger('change:' + key);
+                obj.trigger('change');
+                if (obj.__owner && obj.__owner instanceof base.Dispatcher) {
+                    obj.__owner.trigger('change:' + key);
+                    obj.__owner.trigger('change');
+                }
+            }
+
             if (mnumber.isNumber(key)) {
                 var o = this.__source[key];
                 if (o !== value) {
                     this.__source[key] = value;
-                    this.trigger('change:' + key);
-                    this.trigger('change');
+                    trigger(this, key);
                 }
                 return this;
             }
@@ -3709,18 +3720,33 @@
                 var o = d[ks[l - 1]];
                 if (o !== value) {
                     d[ks[l - 1]] = value;
-                    this.trigger('change:' + k);
-                    this.trigger('change');
+                    trigger(this, k);
                 }
             });
             return this;
         },
 
-        ///取消指定字段
+        ///重设数据源，派发change事件
+        reset: function(source, silent) {
+            marray.isArray(source) || (source = [source]);
+            this.__source = source;
+            if (!silent) {
+                this.trigger('change');
+                this.__owner && this.__owner instanceof base.Dispatcher && this.__owner.trigger('change');
+            }
+            return this;
+        },
+
+        ///取消指定字段，派发unset事件
         unset: function(key) {
+            function trigger(obj, key) {
+                obj.trigger('unset', key);
+                obj.__owner && obj.__owner instanceof base.Dispatcher && obj.__owner.trigger('unset', key);
+            }
+
             if (mnumber.isNumber(key)) {
                 this.__source.splice(key, 1);
-                this.trigger('unset', key);
+                trigger(this, key);
                 return this;
             }
 
@@ -3737,46 +3763,65 @@
             for (; i < l - 1; i++)
                 d = d[ks[i]];
             marray.isArray(d) ? d.splice(ks[l - 1], 1) : (delete d[ks[l - 1]]);
-            this.trigger('unset', key);
+            trigger(this, key);
             return this;
         },
 
+        ///检测指定字段是否已存在
         has: function(key) {
             return base.isDefined(this.get(key));
         },
 
+        ///清空数据源，派发clear事件
         clear: function() {
             this.__source = [];
             this.trigger('clear');
+            this.__owner && this.__owner instanceof base.Dispatcher && this.__owner.trigger('clear');
             return this;
         },
 
+        ///返回数据源的一个副本
         toSource: function() {
             return marray.clone(this.__source, true);
+        },
+
+        clone: function() {
+            return new base.DataProvider(this.toSource()).owner(this.__owner);
+        },
+
+        ///从数据源中挑选出指定字段的值
+        pick: function(key1, key2, key3) {
+            var res = {};
+            marray.each(arguments, function(key) {
+                res[key] = this.get(key);
+            }, null, this);
+            return res;
         }
     });
 
     ///数据模型
-    base.Model = function(dataSource) {
+    base.Model = function(url, provider) {
         if (!(this instanceof base.Model))
-            return new base.Model(dataSource);
+            return new base.Model(url, provider);
 
         base.Dispatcher.call(this);
-        dataSource instanceof base.DataProvider || (dataSource = new base.DataProvider(dataSource));
-        this.provider = dataSource;
-        this.url = '';
-        this.initialize();
+        this.url = url;
+        this.provider = provider instanceof base.DataProvider && provider || new base.DataProvider(provider);
+        this.provider.owner(this);
     }
 
     base.inherit(base.Model, base.Dispatcher, {
-        initialize: function() {},
-
         get: function(key) {
             return this.provider.get(key);
         },
 
         set: function(key, value) {
             this.provider.set(key, value);
+            return this;
+        },
+
+        reset: function(provider, silent) {
+            this.provider.reset(provider instanceof base.DataProvider && provider.toSource() || provider, silent);
             return this;
         },
 
@@ -3798,31 +3843,144 @@
             return this.provider.toSource();
         },
 
-        ///从远程服务器获取数据，并刷新跟name或data-key关联起来的元素数据
-        fetch: function(callback) {
-
+        pick: function(key1, key2, key3) {
+            return this.provider.pick.apply(this.provider, arguments);
         },
 
-        ///提交元素数据到远程服务器
-        commit: function(callback) {
+        ///load数据之前，有一次机会设定loader的参数
+        beforeLoad: function(loader) {},
 
+        ///从远程服务器获取数据，并更新模型的数据
+        load: function() {
+            var loader = new base.Loader(),
+                _ = this;
+            loader.url = this.url;
+            loader.once({
+                success: function(data) {
+                    data && _.reset(data, true);
+                    _.trigger('load');
+                    this.release();
+                },
+                fail: function() {
+                    _.trigger('fail');
+                    this.release();
+                },
+                timeout: function() {
+                    _.trigger('fail');
+                    this.release();
+                }
+            });
+            this.beforeLoad(loader);
+            loader.send();
         },
 
-        destroy: function() {
+        ///commit数据之前，有一次机会设定loader的参数
+        beforeCommit: function(loader) {},
 
+        ///提交模型数据到远程服务器
+        commit: function() {
+            var loader = new base.Loader(),
+                _ = this;
+            loader.url = this.url;
+            loader.method = 'post';
+            loader.params = this.toSource();
+            loader.once({
+                success: function(data) {
+                    _.trigger('commit');
+                    this.release();
+                },
+                fail: function() {
+                    _.trigger('fail');
+                    this.release();
+                },
+                timeout: function() {
+                    _.trigger('fail');
+                    this.release();
+                }
+            });
+            this.beforeCommit(loader);
+            loader.send();
+        },
+
+        clone: function() {
+            return new base.Model(this.url, this.toSource());
         }
     });
 
     ///UI视图
-    base.View = function(model) {
+    base.View = function(ui, model) {
         if (!(this instanceof base.View))
             return new base.View(model);
 
         base.Dispatcher.call(this);
+        this.tpl = null;
+        this.events = null;
+        this.ui = ui;
+        this.model = model;
+        this.initialize();
+        this.render();
+        this.delegate();
     }
 
-    base.inherit(base.View, base.Dispatcher, {
+    base.View.extend = function(obj) {
+        base.extend(base.View.prototype, obj);
+    }
 
+    /*
+     *如果需要实现View的这些属性或方法，可以这样做：
+     *    My.View.extend({
+     *        tpl:"<div><a>{name}</a><a>{value}</a></div>",
+     *        events:{
+     *          "click a":function(){window.open();}
+     *        },
+     *        initialize:function(){},
+     *        render:function(){}
+     *    })
+     */
+    base.inherit(base.View, base.Dispatcher, {
+        initialize: function() {
+            return this;
+        },
+
+        template: function() {
+            return new base.Template(this.model.toSource(), this.tpl).execute();
+        },
+
+        render: function() {
+            this.ui.html(this.template());
+            return this;
+        },
+
+        remove: function() {
+            this.ui && this.ui.remove();
+            this.release();
+        },
+
+        delegate: function() {
+            if (this.events) {
+                mobject.each(this.events, function(h, k) {
+                    k = k.replace(/\s+/, ' ').split(' ');
+                    if (k.length >= 2) {
+                        var ty = k.shift();
+                        k = k.join(' ');
+                        My(k, this.ui).on(ty, h);
+                    }
+                }, null, this);
+            }
+        },
+
+        undelegate: function() {
+            if (this.events) {
+                mobject.each(this.events, function(h, k) {
+                    k = k.replace(/\s+/, ' ').split(' ');
+                    if (k.length >= 2) {
+                        var ty = k.shift();
+                        k = k.join(' ');
+                        My(k, this.ui).off(ty, h);
+                    }
+                }, null, this);
+            }
+        }
     });
 
     ///UI模板
