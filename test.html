@@ -7,16 +7,45 @@
   <body>
   	<div><a href="">11111</a></div>
     <div><a href="">22222</a></div>
+    <div id="formbox"></div>
   </body>
   <script type="text/javascript">
-  	var provider = new My.DataProvider([[1,2,3]]);
-  	provider.on({
-  	    'change:0': function() {
-  	        debugger
-  	    },
-  	    'unset':function(evt){
-			debugger
-  	    }
-  	});
+    var provider = new My.DataProvider([
+        [1, 2, 3]
+    ]);
+    provider.on({
+        'change:0': function() {
+            debugger
+        },
+        'unset': function(evt) {
+            debugger
+        }
+    });
+
+    var home = new M.Model('', {
+        name: 'luoying',
+        wife: 'liyanyan',
+        son: 'luolinan'
+    });
+
+    var HomeView = M.View.extend({
+        tpl: '<form><div><input name="name" value="{name}"></div><div><input name="wife" value="{wife}"></div><div><input name="son" value="{son}"></div><div><input type="submit"></div></form>',
+        events: {
+            'submit form': function(evt) {
+                evt.preventDefault();
+            },
+            'change* input': function(evt, view) {
+                debugger
+                view.model.set(this.name, this.value);
+            }
+        },
+        initialize: function() {
+            this.model.on('change', function() {
+                debugger
+            });
+        }
+    });
+
+    var hv = new HomeView('#formbox', home);
   </script>
 </html>

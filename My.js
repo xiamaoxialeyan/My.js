@@ -459,6 +459,20 @@
 
             guid: function() {
                 return '';
+            },
+
+            template: function(tpl, data) {
+                if (!tpl || !data) return '';
+
+                marray.isArray(data) || (data = [data]);
+
+                var r, t = '';
+                return marray.map(data, function(v) {
+                    t = tpl;
+                    while (r = /\{(\w+)\}/g.exec(t))
+                        t = t.replace(r[0], v[r[1]]);
+                    return t;
+                }).join('');
             }
         };
 
@@ -1476,9 +1490,10 @@
             function remove(tg, ty, fn) {
                 var handlers = this.handlers(tg, ty);
                 marray.each(handlers, function(v, i) {
-                    if (v.fn === fn) {
+                    if (v.fn === fn || v.fn.sfn === fn) {
                         tg.removeEventListener(ty, v, false);
                         handlers.splice(i, 1);
+                        delete v.fn.sfn;
                         delete v.fn;
                         delete v.arg;
                         return false;
@@ -1497,10 +1512,12 @@
 
         once: function(tg, ty, fn, arg) {
             function _once(tg, ty, fn, arg, context) {
-                context.on(tg, ty, function(e) {
+                function handler(e) {
                     context.off(e.target, e.type, arguments.callee);
                     fn.call(this, e, arg);
-                });
+                }
+                handler.sfn = fn;
+                context.on(tg, ty, handler);
             }
 
             if (mobject.isPlainObject(ty)) {
@@ -1538,6 +1555,7 @@
             while (handlers.length) {
                 var handler = handlers.shift();
                 tg.removeEventListener(ty, handler, false);
+                delete handler.fn.sfn;
                 delete handler.fn;
                 delete handler.arg;
             }
@@ -1585,8 +1603,9 @@
             function remove(tg, ty, fn) {
                 var handlers = this.handlers(tg, ty);
                 marray.each(handlers, function(v, i) {
-                    if (v.fn === fn) {
+                    if (v.fn === fn || v.fn.sfn === fn) {
                         handlers.splice(i, 1);
+                        delete v.fn.sfn;
                         delete v.fn;
                         delete v.arg;
                         return false;
@@ -1605,10 +1624,12 @@
 
         once: function(tg, ty, fn, arg) {
             function _once(tg, ty, fn, arg, context) {
-                context.on(tg, ty, function(e) {
+                function handler(e) {
                     context.off(e.target, e.type, arguments.callee);
                     fn.call(this, e, arg);
-                });
+                }
+                handler.sfn = fn;
+                context.on(tg, ty, handler);
             }
 
             if (mobject.isPlainObject(ty)) {
@@ -1645,6 +1666,7 @@
         releaseEvents: function(handlers) {
             while (handlers.length) {
                 var handler = handlers.shift();
+                delete handler.fn.sfn;
                 delete handler.fn;
                 delete handler.arg;
             }
@@ -2632,7 +2654,6 @@
                 return e && e.innerHTML || '';
             }
 
-            h instanceof base.Template && (h = h.execute());
             this.each(function() {
                 base.isDefined(this.innerHTML) && (this.innerHTML = h);
             });
@@ -2646,7 +2667,6 @@
                 return e && e.outerHTML || '';
             }
 
-            h instanceof base.Template && (h = h.execute());
             this.replace(h);
             return this;
         },
@@ -3908,14 +3928,12 @@
     });
 
     ///UI视图
-    base.View = function(ui, model) {
+    base.View = function(el, model) {
         if (!(this instanceof base.View))
             return new base.View(model);
 
         base.Dispatcher.call(this);
-        this.tpl = null;
-        this.events = null;
-        this.ui = ui;
+        this.ui = My(el);
         this.model = model;
         this.initialize();
         this.render();
@@ -3923,15 +3941,20 @@
     }
 
     base.View.extend = function(obj) {
-        base.extend(base.View.prototype, obj);
+        function NView(el, model) {
+            base.View.call(this, el, model);
+        }
+        base.inherit(NView, base.View, obj);
+        return NView;
     }
 
     /*
-     *如果需要实现View的这些属性或方法，可以这样做：
+     *如果需要实现View的这些属性或方法，并生成一个具体View类，可以这样做：
      *    My.View.extend({
      *        tpl:"<div><a>{name}</a><a>{value}</a></div>",
      *        events:{
-     *          "click a":function(){window.open();}
+     *          "click a":function(evt,view){window.open();},
+     *          "change* input":function(evt,view){alert("event is only once!")}
      *        },
      *        initialize:function(){},
      *        render:function(){}
@@ -3943,7 +3966,7 @@
         },
 
         template: function() {
-            return new base.Template(this.model.toSource(), this.tpl).execute();
+            return base.template(this.tpl, this.model.toSource());
         },
 
         render: function() {
@@ -3952,8 +3975,10 @@
         },
 
         remove: function() {
-            this.ui && this.ui.remove();
             this.release();
+            this.undelegate();
+            this.ui && this.ui.remove();
+            return this;
         },
 
         delegate: function() {
@@ -3961,12 +3986,16 @@
                 mobject.each(this.events, function(h, k) {
                     k = k.replace(/\s+/, ' ').split(' ');
                     if (k.length >= 2) {
-                        var ty = k.shift();
+                        var ty = k.shift(),
+                            c = mstring.contains(ty, '*'),
+                            m = c && 'once' || 'on'; //当有*标记，则表示once事件
+                        c && (ty = ty.slice(0, ty.length - 1));
                         k = k.join(' ');
-                        My(k, this.ui).on(ty, h);
+                        My(k, this.ui)[m](ty, h, this);
                     }
                 }, null, this);
             }
+            return this;
         },
 
         undelegate: function() {
@@ -3974,35 +4003,15 @@
                 mobject.each(this.events, function(h, k) {
                     k = k.replace(/\s+/, ' ').split(' ');
                     if (k.length >= 2) {
-                        var ty = k.shift();
+                        var ty = k.shift(),
+                            c = mstring.contains(ty, '*');
+                        c && (ty = ty.slice(0, ty.length - 1));
                         k = k.join(' ');
                         My(k, this.ui).off(ty, h);
                     }
                 }, null, this);
             }
-        }
-    });
-
-    ///UI模板
-    base.Template = function(data, template) {
-        this.data = data;
-        this.template = template;
-    }
-
-    base.extend(base.Template.prototype, {
-        execute: function() {
-            if (!this.data) return '';
-
-            var r, t = '',
-                s = '',
-                _ = this;
-            base.each(this.data, function(v) {
-                t = _.template;
-                while (r = /\{(\w+)\}/g.exec(t))
-                    t = t.replace(r[0], v[r[1]]);
-                s += t;
-            });
-            return s;
+            return this;
         }
     });
 
