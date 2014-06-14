@@ -1957,10 +1957,10 @@
     }
 
     ///XSS--跨域脚本请求累计请求的次数
-    var xssHttpRequestCount = 0,
+    var xssHttpRequestCount = 0;
 
-        ///xss请求回调函数集合
-        callbacks = {};
+    ///xss请求回调函数集合
+    base.callbacks = {};
 
     ///JSONP加载器，跨域脚本请求
     base.JSONPer = function(url, opts) {
@@ -1996,8 +1996,7 @@
             }
 
             this.requestID = this.callback + '_' + (++xssHttpRequestCount); //本次请求id，以区分不同的请求
-            this.callbackName = this.requestID + '_callback'; //本次请求服务器返回的js函数名
-            this.url += (this.url.indexOf('?') === -1 ? '?' : '&') + this.callback + '=' + this.callbackName; //请求路径
+            this.url += (this.url.indexOf('?') === -1 ? '?' : '&') + this.callback + '=My.callbacks.' + this.requestID; //请求路径
 
             this.cache || this.method !== 'GET' || (this.url += '&_=' + base.now()); //在尾部加上日期毫秒数,保证不取缓存
 
@@ -2008,7 +2007,7 @@
 
             var that = this;
             //请求成功完毕，服务器返回的js函数，参数中就包含了请求所得到的数据内容
-            callbacks[this.callbackName] = function(data) {
+            base.callbacks[this.requestID] = function(data) {
                 setXssResult(that, data);
             }
 
@@ -2031,8 +2030,7 @@
             this.timeoutWatcher = 0;
             this.requester.parentNode.removeChild(this.requester);
             this.requester = null;
-            delete callbacks[this.callbackName];
-            this.callbackName = '';
+            delete base.callbacks[this.requestID];
             successed || this.trigger('destroy', null, this);
         }
     });
@@ -2050,7 +2048,7 @@
                 return;
             }
         }
-        xss.data = d;
+        xss.data = data;
         xss.trigger('success', null, xss);
         xss.abort(true);
     }
