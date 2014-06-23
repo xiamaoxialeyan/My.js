@@ -3417,166 +3417,6 @@
             return this;
         },
 
-        click: function(fn) {
-            return arguments.length && this.on('click', fn) || this.trigger('click');
-        },
-
-        dblclick: function(fn) {
-            return arguments.length && this.on('dblclick', fn) || this.trigger('dblclick');
-        },
-
-        mousedown: function(fn) {
-            return arguments.length && this.on('mousedown', fn) || this.trigger('mousedown');
-        },
-
-        mouseup: function(fn) {
-            return arguments.length && this.on('mouseup', fn) || this.trigger('mouseup');
-        },
-
-        mousemove: function(fn) {
-            return arguments.length && this.on('mousemove', fn) || this.trigger('mousemove');
-        },
-
-        ///注册鼠标移入事件，不论鼠标指针移入事件元素或其子元素都会被触发
-        mouseover: function(fn) {
-            return arguments.length && this.on('mouseover', fn) || this.trigger('mouseover');
-        },
-
-        ///注册鼠标移出事件，不论鼠标指针移出事件元素或其子元素都会被触发
-        mouseout: function(fn) {
-            return arguments.length && this.on('mouseout', fn) || this.trigger('mouseout');
-        },
-
-        ///注册鼠标进入事件，只在鼠标指针进入事件元素时触发，移入子元素不会触发，这点与mouseover事件不同
-        mouseenter: function(fn) {
-            return arguments.length && this.on('mouseenter', fn) || this.trigger('mouseenter');
-        },
-
-        ///注册鼠标离开事件，只在鼠标指针离开事件元素时触发，移出子元素不会触发，这点与mouseout事件不同
-        mouseleave: function(fn) {
-            return arguments.length && this.on('mouseleave', fn) || this.trigger('mouseleave');
-        },
-
-        mousewheel: function(fn) {
-            return arguments.length && this.on('mousewheel', fn) || this.trigger('mousewheel');
-        },
-
-        ///注册滚动条滚动事件，此事件仅对拥有滚动条的元素(window/iframe或设置了overflow=scroll/auto的元素)起作用
-        scroll: function(fn) {
-            return arguments.length && this.on('scroll', fn) || this.trigger('scroll');
-        },
-
-        ///注册拖动元素拖动事件
-        drag: function(fn) {
-            return arguments.length && this.on('drag', fn) || this.trigger('drag');
-        },
-
-        ///注册拖动元素拖动开始事件
-        dragstart: function(fn) {
-            return arguments.length && this.on('dragstart', fn) || this.trigger('dragstart');
-        },
-
-        ///注册拖动元素拖动结束事件（松开了鼠标）
-        dragend: function(fn) {
-            return arguments.length && this.on('dragend', fn) || this.trigger('dragend');
-        },
-
-        ///注册被拖动至有效拖放目标上方时事件
-        dragover: function(fn) {
-            return arguments.length && this.on('dragover', fn) || this.trigger('dragover');
-        },
-
-        ///注册被拖入有效拖放目标时事件
-        dragenter: function(fn) {
-            return arguments.length && this.on('dragenter', fn) || this.trigger('dragenter');
-        },
-
-        ///注册被拖离有效拖放目标时事件
-        dragleave: function(fn) {
-            return arguments.length && this.on('dragleave', fn) || this.trigger('dragleave');
-        },
-
-        ///注册拖入拖放目标事件（松开了鼠标）
-        drop: function(fn) {
-            return arguments.length && this.on('drop', fn) || this.trigger('drop');
-        },
-
-        keydown: function(fn) {
-            return arguments.length && this.on('keydown', fn) || this.trigger('keydown');
-        },
-
-        keypress: function(fn) {
-            return arguments.length && this.on('keypress', fn) || this.trigger('keypress');
-        },
-
-        keyup: function(fn) {
-            return arguments.length && this.on('keyup', fn) || this.trigger('keyup');
-        },
-
-        ///注册表单元素value值被更改事件
-        ///此事件仅对表单元素有效，如form或input=text/password/search/email/url/date/month/week/time/datetime/datetime-local/number/range/color/file/checkbox/radio或select/textarea等
-        change: function(fn) {
-            return arguments.length && this.on('change', fn) || this.trigger('change');
-        },
-
-        ///注册表单元素输入事件，支持的元素同change
-        input: function(fn) {
-            return arguments.length && this.on('input', fn) || this.trigger('input');
-        },
-
-        ///注册表单元素验证失败事件，支持的元素同change，除了form
-        invalid: function(fn) {
-            return arguments.length && this.on('invalid', fn) || this.trigger('invalid');
-        },
-
-        ///注册选取表单元素文本内容事件，input=text/password/search/email/url/number或textarea
-        select: function(fn) {
-            return arguments.length && this.on('select', fn) || this.trigger('select');
-        },
-
-        ///注册form的submit事件
-        submit: function(fn) {
-            return arguments.length && this.on('submit', fn) || this.trigger('submit');
-        },
-
-        ///注册form的reset事件
-        reset: function(fn) {
-            return arguments.length && this.on('reset', fn) || this.trigger('reset');
-        },
-
-        focus: function(fn) {
-            return arguments.length && this.on('focus', fn) || this.trigger('focus');
-        },
-
-        blur: function(fn) {
-            return arguments.length && this.on('blur', fn) || this.trigger('blur');
-        },
-
-        ///注册窗口或框架被重新调整大小事件；此事件只对window窗口起作用
-        resize: function(fn) {
-            return arguments.length && this.on('resize', fn) || this.trigger('resize');
-        },
-
-        ///页面或图片/脚本/文件/框架等加载完毕事件
-        load: function(fn) {
-            return arguments.length && this.on('load', fn) || this.trigger('load');
-        },
-
-        ///页面卸载/跳转/退出事件
-        unload: function(fn) {
-            return arguments.length && this.on('unload', fn) || this.trigger('unload');
-        },
-
-        ///页面或图片/脚本/文件/框架等加载错误事件
-        error: function(fn) {
-            return arguments.length && this.on('error', fn) || this.trigger('error');
-        },
-
-        ///页面或图片/脚本/文件/框架等加载中断事件
-        abort: function(fn) {
-            return arguments.length && this.on('abort', fn) || this.trigger('abort');
-        },
-
         /*
          *全文档点击事件，当点击在除元素以外的任何元素上（被阻止冒泡的元素除外），就执行指定函数
          *此方法通常应用在点击页面时关闭/最小化浮动元素或弹出层
@@ -3664,6 +3504,15 @@
             });
         }
     };
+
+    marray.each(('click dblclick mousedown mousemove mouseup mouseover mouseout mouseenter mouseleave mousewheel scroll drag dragstart dragend dragover dragenter dragleave drop' +
+        ' keydown keypress keyup change input invalid select submit reset focus blur resize load unload error abort').split(' '), function(n) {
+        var f = function(fn) {
+            return arguments.length && this.on(arguments.callee.type, fn) || this.trigger(arguments.callee.type);
+        }
+        f.type = n;
+        _M_.prototype[n] = f;
+    });
 
     ///数据提供者，监听数据的变化
     base.DataProvider = function(source) {
