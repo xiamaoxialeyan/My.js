@@ -2546,6 +2546,13 @@
             return new _M_(cc);
         },
 
+        ///对DOM元素执行清除操作，包括绑定的事件和数据
+        clear: function() {
+            this.remove();
+            this.removeData();
+            this.release();
+        },
+
         prev: function(selector) {
             var cc = [];
             this.each(function() {
