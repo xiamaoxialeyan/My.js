@@ -20,12 +20,12 @@
     My.isReady = false;
     window.M = window.My = My;
 
-    var guidStr = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$',
-        primitiveTypes = ['undefined', 'string', 'number', 'boolean'],
+    var primitiveTypes = ['undefined', 'string', 'number', 'boolean'],
         toString = Object.prototype.toString,
         slice = Array.prototype.slice,
         loadRegisted = false,
         readyfns = [],
+        guidCount = 0,
 
         base = {
             isMy: function(obj) {
@@ -458,7 +458,7 @@
             },
 
             guid: function() {
-                return '';
+                return 'guid_' + (++guidCount);
             },
 
             template: function(tpl, data) {
@@ -610,7 +610,7 @@
             return !isNaN(parseFloat(n)) && isFinite(n);
         },
 
-        addZero: function(n, len) {
+        zeroize: function(n, len) {
             if (!this.isNumber(n))
                 return '';
 
@@ -1227,34 +1227,34 @@
             return f ? (base.isDefined(a) ? 'RGBA(' + r + ',' + g + ',' + b + ',' + a + ')' : 'RGB(' + r + ',' + g + ',' + b + ')') : ('#' + r.toString(16) + g.toString(16) + b.toString(16));
         },
 
-        getRed: function(c) {
+        red: function(c) {
             if (!c) return;
 
-            regRgb.test(c) || (c = this.toRGB(c));
+            regRgb.test(c) || (c = this.rgb(c));
             return parseInt(c.replace(regRep, '').split(',')[0]);
         },
 
-        getGreen: function(c) {
+        green: function(c) {
             if (!c) return;
 
-            regRgb.test(c) || (c = this.toRGB(c));
+            regRgb.test(c) || (c = this.rgb(c));
             return parseInt(c.replace(regRep, '').split(',')[1]);
         },
 
-        getBlue: function(c) {
+        blue: function(c) {
             if (!c) return;
 
-            regRgb.test(c) || (c = this.toRGB(c));
+            regRgb.test(c) || (c = this.rgb(c));
             return parseInt(c.replace(regRep, '').split(',')[2]);
         },
 
-        getAlpha: function(rgba) {
+        alpha: function(rgba) {
             if (!rgba || !/^rgba\(\d+,\d+,\d+,[\d\.]+\)$/i.test(rgba)) return;
 
             return parseFloat(rgba.replace(regRep, '').split(',')[3]);
         },
 
-        toHex: function(c) {
+        hex: function(c) {
             if (regRgb.test(c)) {
                 var cs = c.replace(regRep, '').split(','),
                     sh = '#',
@@ -1290,7 +1290,7 @@
             return c;
         },
 
-        toRGB: function(c, a) {
+        rgb: function(c, a) {
             if (!c) return '';
 
             c = c.toUpperCase();
@@ -2160,7 +2160,7 @@
     ///元素集合，逐一插入_M_的实例，维护length属性
     function insertElements(eles, m) {
         marray.each(eles, function(v) {
-            m[m.length++] = v;
+            base.isMy(v) ? (insertElements(v, m)) : m[m.length++] = v;
         });
     }
 
@@ -2225,6 +2225,15 @@
             return this;
         },
 
+        map: function(fn, arg) {
+            if (mfn.isFunction(fn)) {
+                return new _M_(marray.map(this, function(o, i) {
+                    return fn.call(o, o, i, arg);
+                }));
+            }
+            return this;
+        },
+
         isEmpty: function() {
             return this.length === 0;
         },
@@ -2281,8 +2290,42 @@
         },
 
         ///判断DOM元素集合中是否包含目标元素
-        has: function(target) {
-            return this.index(target) > -1;
+        has: function(selector) {
+            return this.index(selector) > -1;
+        },
+
+        ///检测是否是指定的元素
+        is: function(selector) {
+            return this.filter(selector).length > 0;
+        },
+
+        ///剔除指定的元素
+        not: function(selector) {
+            var cc = [];
+            if (selector) {
+                var isS = mstring.isString(selector),
+                    isM = !isS && base.isMy(selector),
+                    isE = !isE && base.isDomElement(selector);
+
+                if (isS || isM || isE) {
+                    this.each(function() {
+                        if (isS) {
+                            marray.each.call(this, base.query(selector, this.parentNode), function(v) {
+                                v !== this && cc.push(this);
+                            });
+                            return;
+                        }
+
+                        if (isM) {
+                            !selector.has(this) && cc.push(this);
+                            return;
+                        }
+
+                        this !== selector && cc.push(this);
+                    });
+                }
+            }
+            return new _M_(cc);
         },
 
         ///过滤出来指定的元素
@@ -3211,7 +3254,7 @@
         },
 
         ///返回元素的可见性(display或visibility状态)，只返回第一个元素
-        getVisible: function() {
+        visible: function() {
             var e = this[0];
             return e && (e.style.display !== '' && e.style.visibility !== 'hidden');
         },
@@ -3442,18 +3485,18 @@
         },
 
         /*
-         *对元素（通常是弹出窗口）绑定拖拽动作，这样就可以用鼠标按住可拖拽部分（通常是弹出窗口标题），移动鼠标拖拽
-         *rect：限制拖拽的矩形范围，格式如：{left:0,top:0,width:100,height:100}；默认无限制范围
+         *对元素（通常是弹出窗口）绑定平移动作，这样就可以用鼠标按住可拖拽部分（通常是弹出窗口标题），移动鼠标拖动平移
+         *rect：限制平移的矩形范围，只在此范围内拖动，格式如：{left:0,top:0,width:100,height:100}；默认无限制范围
          */
-        setDrag: function(dragabler, rect) {
-            var isS = mstring.isString(dragabler),
-                isE = !isS && base.isDomElement(dragabler),
-                isM = !isE && base.isMy(dragabler);
+        move: function(parts, rect) {
+            var isS = mstring.isString(parts),
+                isE = !isS && base.isDomElement(parts),
+                isM = !isE && base.isMy(parts);
 
             if (isS || isE || isM) {
                 var $ = new _M_();
-                (isE || isM) && $.add(dragabler) || this.each(function() {
-                    $.add(base.query(dragabler, this));
+                (isE || isM) && $.add(parts) || this.each(function() {
+                    $.add(base.query(parts, this));
                 });
 
                 var pre = null,
