@@ -3851,7 +3851,7 @@
      *        tpl:"<div><a>{name}</a><a>{value}</a></div>",
      *        events:{
      *          "click a":function(evt,view){window.open();},
-     *          "change* input":function(evt,view){alert("event is only once!")}
+     *          "change? input":function(evt,view){alert("event is only once!")}
      *        },
      *        initialize:function(){},
      *        render:function(){}
@@ -3884,8 +3884,8 @@
                     k = k.replace(/\s+/, ' ').split(' ');
                     if (k.length >= 2) {
                         var ty = k.shift(),
-                            c = mstring.contains(ty, '*'),
-                            m = c && 'once' || 'on'; //当有*标记，则表示once事件
+                            c = mstring.contains(ty, '?'),
+                            m = c && 'once' || 'on'; //当有?标记，则表示once事件
                         c && (ty = ty.slice(0, ty.length - 1));
                         k = k.join(' ');
                         My(k, this.ui)[m](ty, h, this);
@@ -3901,7 +3901,7 @@
                     k = k.replace(/\s+/, ' ').split(' ');
                     if (k.length >= 2) {
                         var ty = k.shift(),
-                            c = mstring.contains(ty, '*');
+                            c = mstring.contains(ty, '?');
                         c && (ty = ty.slice(0, ty.length - 1));
                         k = k.join(' ');
                         My(k, this.ui).off(ty, h);
