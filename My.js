@@ -5,7 +5,7 @@
  ***  @version:1.0.0                           ** ***  **** *       **  ***                  ***
  ***  @author:Luoying                          **     *    **        * ***                   ***
  ***  @date:2013-7-1                           **          **         ***                    ***
- ***  @modify:date 2014-5-7                    **          **        ***                     ***
+ ***  @modify:2014-7-3                         **          **        ***                     ***
  ***  @copyright:China                         **          **       ***                      ***
  ***  @comment:No support for old browser      **          **      ***                       ***
  ***********************************************************************************************
@@ -72,7 +72,7 @@
             },
 
             filter: function(a, fn, arg, context) {
-                if (marray.isArray(a))
+                if (marray.isArray(a) || marray.isArrayLike(a))
                     return marray.filter.apply(this, arguments);
 
                 if (mobject.isPlainObject(a))
@@ -80,7 +80,7 @@
             },
 
             map: function(a, fn, arg, context) {
-                if (marray.isArray(a))
+                if (marray.isArray(a) || marray.isArrayLike(a))
                     return marray.map.apply(this, arguments);
 
                 if (mobject.isPlainObject(a))
@@ -93,6 +93,7 @@
 
                 var ta = typeof a,
                     tb = typeof b;
+
                 if (ta != tb)
                     return false;
 
@@ -108,12 +109,32 @@
                 return (aisa ? marray.equals(a, b) : mobject.equals(a, b));
             },
 
+            empty: function(type) {
+                return {
+                    'undefined': undefined,
+                    'null': null,
+                    'string': '',
+                    'number': 0,
+                    'boolean': false,
+                    'object': {},
+                    'array': [],
+                    'function': function() {},
+                    'my': new _M_()
+                }[type || 'object'];
+            },
+
             isEmpty: function(a) {
+                if (marray.contains([undefined, null, '', 0, false], a))
+                    return true;
+
+                if (mnumber.isNumber(a))
+                    return isNaN(a);
+
+                if (mfn.isFunction(a))
+                    return mfn.isEmpty(a);
+
                 if (this.isMy(a))
                     return a.isEmpty();
-
-                if (mstring.isString(a))
-                    return mstring.isEmpty(a);
 
                 if (marray.isArray(a) || marray.isArrayLike(a))
                     return marray.isEmpty(a);
@@ -121,7 +142,7 @@
                 if (mobject.isPlainObject(a))
                     return mobject.isEmpty(a);
 
-                return true;
+                return false;
             },
 
             size: function(a) {
@@ -132,20 +153,6 @@
                     return mobject.size(a);
 
                 return 0;
-            },
-
-            empty: function(type) {
-                return {
-                    'undefined': undefined,
-                    'null': null,
-                    'string': '',
-                    'number': NaN,
-                    'boolean': false,
-                    'object': {},
-                    'array': [],
-                    'function': function() {},
-                    'my': new _M_()
-                }[type || 'object'];
             },
 
             contains: function(a, e, pos) {
@@ -181,6 +188,16 @@
                 return null;
             },
 
+            fromArray: function(arr, keys) {
+                var rs = {};
+                if ((marray.isArray(arr) || marray.isArrayLike(arr)) && marray.isArray(keys) && arr.length <= keys.length) {
+                    marray.each(arr, function(a, i) {
+                        rs[keys[i]] = a;
+                    });
+                }
+                return rs;
+            },
+
             toArray: function(arrayLike) {
                 if (marray.isArrayLike(arrayLike)) {
                     return marray.map(arrayLike, function(v) {
@@ -209,6 +226,9 @@
                 if (type === 'string')
                     return mstring.range(first, second, step);
 
+                if (type === 'date')
+                    return mdate.range(first, second, step, arguments[4]);
+
                 return null;
             },
 
@@ -225,7 +245,7 @@
                     return marray.merge(dest, source);
 
                 if (mobject.isPlainObject(dest))
-                    return mobject.merge(dest);
+                    return mobject.merge(dest, source);
             },
 
             inherit: function(subCls, superCls, args) {
@@ -310,10 +330,10 @@
                 loader.url = url;
                 loader.dataType = opts.dataType || this.ajaxSettings.dataType;
                 loader.contentType = opts.contentType || this.ajaxSettings.contentType;
-                loader.parse = opts.parse === undefined ? this.ajaxSettings.parse : opts.parse;
-                loader.async = opts.async === undefined ? this.ajaxSettings.async : opts.async;
-                loader.cache = opts.cache === undefined ? this.ajaxSettings.cache : opts.cache;
-                loader.timeout = opts.timeout === undefined ? this.ajaxSettings.timeout : opts.timeout;
+                loader.parse = base.isUndefined(opts.parse) ? this.ajaxSettings.parse : opts.parse;
+                loader.async = base.isUndefined(opts.async) ? this.ajaxSettings.async : opts.async;
+                loader.cache = base.isUndefined(opts.cache) ? this.ajaxSettings.cache : opts.cache;
+                loader.timeout = base.isUndefined(opts.timeout) ? this.ajaxSettings.timeout : opts.timeout;
 
                 loader.once({
                     success: function(e) {
@@ -331,7 +351,7 @@
                         this.release();
                         loader = null;
                     }
-                })
+                });
 
                 loader.send();
                 return {
@@ -509,11 +529,9 @@
         },
 
         repeat: function(str, count) {
+            count = Math.floor(Number(count));
             if (!mnumber.isNumber(count) || count < 0)
                 return '';
-
-            count = Math.floor(count);
-            if (count === 0) return '';
 
             var s = '';
             while (count--) {
@@ -523,8 +541,7 @@
         },
 
         range: function(first, second, step) {
-            var s = marray.range(first, second, step);
-            return s && s.join('') || '';
+            return marray.range(first, second, step).join('');
         },
 
         fill: function(s, start, number, value) {
@@ -639,16 +656,14 @@
             return key === undefined || hasOwn.call(obj, key);
         },
 
-        size: function(obj) {
-            var l = 0;
-            this.each(obj, function() {
-                l++;
-            });
-            return l;
-        },
-
         isEmpty: function(obj) {
             return this.size(obj) === 0;
+        },
+
+        size: function(obj) {
+            var l = 0;
+            for (var k in obj) l++
+            return l;
         },
 
         equals: function(obj1, obj2) {
@@ -794,31 +809,29 @@
         },
 
         repeat: function(e, count) {
+            count = Math.floor(Number(count));
             if (!mnumber.isNumber(count) || count < 0)
-                return null;
-
-            count = Math.floor(count);
-            if (count === 0) return '';
+                return [];
 
             var s = [];
             while (count--) {
-                s[s.length++] = e;
+                this.merge(s, e);
             }
             return s;
         },
 
         range: function(first, second, step) {
             if (base.isUndefined(first) || base.isUndefined(second))
-                return null;
+                return [];
 
             var isNumber = mnumber.isNumber(first),
                 isString = !isNumber && mstring.isString(first);
 
             if ((!isNumber && !isString) || (isNumber && !mnumber.isNumber(second)) || (isString && !mstring.isString(second)))
-                return null;
+                return [];
 
             if (base.isDefined(step) && !mnumber.isNumber(step))
-                return null;
+                return [];
 
             first = isString && first.charCodeAt(0) || first;
             second = isString && second.charCodeAt(0) || second;
@@ -850,7 +863,7 @@
 
         fill: function(arr, start, number, value) {
             if (base.isUndefined(start) || !mnumber.isNumber(number) || number <= 0 || base.isUndefined(value))
-                return null;
+                return [];
 
             var c = 0;
             this.each(arr, function(v, i) {
@@ -1090,6 +1103,16 @@
                 new RegExp("(" + k + ")").test(fmt) && (fmt = fmt.replace(RegExp.$1, RegExp.$1.length === 1 ? v : ("00" + v).substr(("" + v).length)));
             });
             return fmt;
+        },
+
+        range: function(first, second, step, fmt) {
+            //range(2010,2014,1)=>[2010,2011,2012,2013,2014]
+            ///range('2010/1','2014/12','1/1')=>['2010/1','2010/2',...,'2011/1',...,'2012/1',...,'2014/1',...,'2014/12']
+            ///range('2010/1/1','2014/1/30','1/1/1')
+            ///range('2010/1/1 0','2014/1/1 23','1/1/1 1')
+            ///range('2010/1/1 0:00','2014/1/1 23:59','1/1/1 1:30')
+            ///range('2010/1/1 0:00:00','2014/1/1 23:59:59','1/1/1 1:30:60')
+            ///range('2010/1/1 0:00:00:0','2014/1/1 23:59:59:999','1/1/1 1:30:60:100')
         }
     };
 
@@ -1102,6 +1125,11 @@
 
         empty: function() {
             return function() {};
+        },
+
+        isEmpty: function(fn) {
+            var s = fn.toString();
+            return s.substr(s.indexOf('{') + 1, 1) === '}';
         }
     };
 
