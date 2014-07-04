@@ -226,9 +226,6 @@
                 if (type === 'string')
                     return mstring.range(first, second, step);
 
-                if (type === 'date')
-                    return mdate.range(first, second, step, arguments[4]);
-
                 return null;
             },
 
@@ -241,7 +238,7 @@
             },
 
             merge: function(dest, source) {
-                if (marray.isArray(dest))
+                if (marray.isArray(dest) || marray.isArrayLike(dest))
                     return marray.merge(dest, source);
 
                 if (mobject.isPlainObject(dest))
@@ -396,6 +393,7 @@
 
                     ext === 'js' ? loadScript(v, cb) : (ext === 'css' ? loadCSS(v, cb) : null);
                 });
+                return this;
             },
 
             stringify: function(data, type) {
@@ -434,31 +432,19 @@
                 }
             },
 
-            parseHTML: function(data) {
-                if (!mstring.isString(data))
-                    return null;
-
-                var dom;
-                try {
-                    var parser = new DOMParser();
-                    dom = parser.parseFromString(data, "text/html");
-                    dom && (dom = dom.body.children || dom.body.childNodes);
-                } catch (e) {
-                    dom = null;
-                }
-                return new _M_(dom);
-            },
-
             on: function(tg, ty, fn, arg) {
                 isOriginalEvent(tg, ty) ? devent.on(tg, ty, fn, arg) : cevent.on(tg, ty, fn, arg);
+                return this;
             },
 
             once: function(tg, ty, fn, arg) {
                 isOriginalEvent(tg, ty) ? devent.once(tg, ty, fn, arg) : cevent.once(tg, ty, fn, arg);
+                return this;
             },
 
             off: function(tg, ty, fn) {
                 isOriginalEvent(tg, ty) ? devent.off(tg, ty, fn) : cevent.off(tg, ty, fn);
+                return this;
             },
 
             listened: function(tg, ty) {
@@ -467,10 +453,12 @@
 
             release: function(tg, ty) {
                 isOriginalEvent(tg, ty) ? devent.release(tg, ty) : cevent.release(tg, ty);
+                return this;
             },
 
             trigger: function(tg, ty, data, scope) {
                 isOriginalEvent(tg, ty) ? devent.trigger(tg, ty, data, scope) : cevent.trigger(tg, ty, data, scope);
+                return this;
             },
 
             now: function() {
@@ -1064,8 +1052,8 @@
         },
 
         merge: function(dest, source) {
-            if (!this.isArray(source))
-                return null;
+            if (!this.isArray(source) && !this.isArrayLike(source))
+                return dest;
 
             this.each(source, function(v) {
                 dest[dest.length++] = v;
@@ -1103,16 +1091,6 @@
                 new RegExp("(" + k + ")").test(fmt) && (fmt = fmt.replace(RegExp.$1, RegExp.$1.length === 1 ? v : ("00" + v).substr(("" + v).length)));
             });
             return fmt;
-        },
-
-        range: function(first, second, step, fmt) {
-            //range(2010,2014,1)=>[2010,2011,2012,2013,2014]
-            ///range('2010/1','2014/12','1/1')=>['2010/1','2010/2',...,'2011/1',...,'2012/1',...,'2014/1',...,'2014/12']
-            ///range('2010/1/1','2014/1/30','1/1/1')
-            ///range('2010/1/1 0','2014/1/1 23','1/1/1 1')
-            ///range('2010/1/1 0:00','2014/1/1 23:59','1/1/1 1:30')
-            ///range('2010/1/1 0:00:00','2014/1/1 23:59:59','1/1/1 1:30:60')
-            ///range('2010/1/1 0:00:00:0','2014/1/1 23:59:59:999','1/1/1 1:30:60:100')
         }
     };
 
@@ -1149,6 +1127,26 @@
 
         decodeHTML: function(s) {
             return (s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ');
+        },
+
+        isHTML: function(s) {
+            var h = this.parseHTML(s);
+            return h != null && h.length;
+        },
+
+        parseHTML: function(s) {
+            if (!mstring.isString(s))
+                return null;
+
+            var dom;
+            try {
+                var parser = new DOMParser();
+                dom = parser.parseFromString(s, "text/html");
+                dom && (dom = dom.body.children || dom.body.childNodes);
+            } catch (e) {
+                dom = null;
+            }
+            return new _M_(dom);
         }
     };
 
@@ -1483,7 +1481,7 @@
                 guid = false;
                 return false;
             }
-        })
+        });
         return guid;
     }
 
@@ -1725,14 +1723,17 @@
     base.Dispatcher.prototype = {
         on: function(ty, fn, arg) {
             cevent.on(this, ty, fn, arg);
+            return this;
         },
 
         off: function(ty, fn) {
             cevent.off(this, ty, fn);
+            return this;
         },
 
         once: function(ty, fn, arg) {
             cevent.once(this, ty, fn, arg);
+            return this;
         },
 
         listened: function(ty) {
@@ -1741,10 +1742,12 @@
 
         release: function(ty) {
             cevent.release(this, ty);
+            return this;
         },
 
         trigger: function(ty, data, scope) {
             cevent.trigger(this, ty, data, scope);
+            return this;
         }
     }
 
@@ -1869,14 +1872,14 @@
         base.Dispatcher.call(this);
         opts = opts || {};
         this.url = url;
-        this.async = opts.async === undefined && base.ajaxSettings.async || opts.async;
         this.method = (opts.method || base.ajaxSettings.method).toUpperCase();
         this.params = opts.params; //发送到服务器的参数：键值对，仅POST有用，若是GET，设置此属性无效
         this.dataType = opts.dataType || base.ajaxSettings.dataType;
         this.contentType = opts.contentType || base.ajaxSettings.contentType;
-        this.parse = opts.parse === undefined && base.ajaxSettings.parse || opts.parse;
-        this.cache = opts.cache === undefined && base.ajaxSettings.cache || opts.cache;
-        this.timeout = opts.timeout === undefined && base.ajaxSettings.timeout || opts.timeout;
+        this.async = base.isUndefined(opts.async) && base.ajaxSettings.async || opts.async;
+        this.parse = base.isUndefined(opts.parse) && base.ajaxSettings.parse || opts.parse;
+        this.cache = base.isUndefined(opts.cache) && base.ajaxSettings.cache || opts.cache;
+        this.timeout = base.isUndefined(opts.timeout) && base.ajaxSettings.timeout || opts.timeout;
         this.data = null; //数据内容，当服务器响应后，此属性被赋值为该响应内容，数据类型与dataType有关
         this.header = null;
         this.timeoutWatcher = null;
@@ -1998,11 +2001,11 @@
         base.Dispatcher.call(this);
         opts = opts || {};
         this.url = '';
-        this.async = opts.async === undefined ? base.ajaxSettings.async : opts.async;
         this.dataType = opts.dataType || base.ajaxSettings.dataType;
-        this.parse = opts.parse === undefined ? base.ajaxSettings.parse : opts.parse;
-        this.cache = opts.cache === undefined ? base.ajaxSettings.cache : opts.cache;
-        this.timeout = opts.timeout === undefined ? base.ajaxSettings.timeout : opts.timeout;
+        this.async = base.isUndefined(opts.async) ? base.ajaxSettings.async : opts.async;
+        this.parse = base.isUndefined(opts.parse) ? base.ajaxSettings.parse : opts.parse;
+        this.cache = base.isUndefined(opts.cache) ? base.ajaxSettings.cache : opts.cache;
+        this.timeout = base.isUndefined(opts.timeout) ? base.ajaxSettings.timeout : opts.timeout;
         this.callback = opts.callback || base.ajaxSettings.callback;
         this.requestID = '';
         this.callbackName = '';
@@ -2105,7 +2108,7 @@
     }
 
     function loadScript(url, callback) {
-        M('head').append(base.create('script').attr({
+        My('head').append(base.create('script').attr({
             type: 'text/javascript',
             src: url
         }).load(function() {
@@ -2118,7 +2121,7 @@
     }
 
     function loadCSS(url, callback) {
-        M('head').append(base.create('link').attr({
+        My('head').append(base.create('link').attr({
             rel: 'stylesheet',
             type: 'text/css',
             href: url
@@ -2192,7 +2195,7 @@
         });
     }
 
-    ///一个对DOM进行操作的类，敲入My().能够访问的接口集合
+    ///一个对DOM进行操作的类，敲入My().能够访问的接口集合，这是一个伪数组
     function _M_(s, p) {
         if (mfn.isFunction(s)) { //当参数是一个函数，表示监听load事件(文档加载完成)
             registerLoad(s);
@@ -2210,7 +2213,7 @@
                 this[0] = s;
                 this.length = 1;
             } else if (mstring.isString(s)) {
-                insertElements(base.query(s, p), this);
+                insertElements(mhtml.isHTML(s) ? mhtml.parseHTML(s) : base.query(s, p), this);
             } else if (marray.isArray(s) || marray.isArrayLike(s)) {
                 insertElements(s, this);
             }
@@ -2275,29 +2278,13 @@
 
         ///添加新元素到DOM元素集合中
         add: function(selector) {
-            if (selector) {
-                var isS = mstring.isString(selector),
-                    isM = !isS && base.isMy(selector),
-                    isE = !isM && base.isDomElement(selector),
-                    e = isS && base.query(selector) || (isE && [selector]) || (isM && selector);
-                e && insertElements(e, this);
-            }
+            selector && marray.merge(this, My(selector));
             return this;
         },
 
-        ///检索指定元素在DOM元素集合中的索引位置
-        index: function(selector) {
-            var index = -1;
-            if (selector) {
-                mstring.isString(selector) && (selector = base.query(selector)[0]);
-                this.each(function(i) {
-                    if (this === selector) {
-                        index = i;
-                        return false;
-                    }
-                });
-            }
-            return index;
+        ///检索元素（只第一个元素）在其兄弟元素中的排行位置
+        index: function() {
+            return this[0] && this[0].parentNode ? this.prevAll().length : -1;
         },
 
         ///获取指定索引位置的元素
@@ -2313,13 +2300,27 @@
             return new _M_(this[this.length - 1]);
         },
 
+        ///按序号获取元素，序号从1开始
         nth: function(eq) {
-            return new _M_(this.get(eq - 1)); //start from index 1
+            return new _M_(this.get(eq - 1));
         },
 
         ///判断DOM元素集合中是否包含目标元素
         has: function(selector) {
-            return this.index(selector) > -1;
+            if (selector) {
+                var a = My(selector),
+                    h = false;
+                this.each(function() {
+                    for (var i = 0, l = a.length; i < l; i++) {
+                        if (this === a[i]) {
+                            h = true;
+                            return false;
+                        }
+                    }
+                });
+                return h;
+            }
+            return false;
         },
 
         ///检测是否是指定的元素
@@ -2329,30 +2330,13 @@
 
         ///剔除指定的元素
         not: function(selector) {
-            var cc = [];
-            if (selector) {
-                var isS = mstring.isString(selector),
-                    isM = !isS && base.isMy(selector),
-                    isE = !isE && base.isDomElement(selector);
-
-                if (isS || isM || isE) {
-                    this.each(function() {
-                        if (isS) {
-                            marray.each.call(this, base.query(selector, this.parentNode), function(v) {
-                                v !== this && cc.push(this);
-                            });
-                            return;
-                        }
-
-                        if (isM) {
-                            !selector.has(this) && cc.push(this);
-                            return;
-                        }
-
-                        this !== selector && cc.push(this);
-                    });
+            var cc = [],
+                a = My(selector);
+            a.length && this.each(function() {
+                for (var i = 0, l = a.length; i < l; i++) {
+                    this === a[i] || cc.push(this);
                 }
-            }
+            }) || (cc = this.elements());
             return new _M_(cc);
         },
 
@@ -2360,30 +2344,12 @@
         filter: function(selector) {
             var cc = [];
             if (selector) {
-                var isS = mstring.isString(selector),
-                    isM = !isS && base.isMy(selector),
-                    isE = !isE && base.isDomElement(selector);
-
-                if (isS || isM || isE) {
-                    this.each(function() {
-                        if (isS) {
-                            marray.each.call(this, base.query(selector, this.parentNode), function(v) {
-                                if (v === this) {
-                                    cc.push(this);
-                                    return false;
-                                }
-                            });
-                            return;
-                        }
-
-                        if (isM) {
-                            selector.has(this) && cc.push(this);
-                            return;
-                        }
-
-                        this === selector && cc.push(this);
-                    });
-                }
+                var a = My(selector);
+                this.each(function() {
+                    for (var i = 0, l = a.length; i < l; i++) {
+                        this === a[i] && cc.push(this);
+                    }
+                });
             }
             return new _M_(cc);
         },
@@ -2398,11 +2364,8 @@
 
                 if (isS || isM || isE) {
                     this.each(function() {
-                        var childs, k, c, l;
                         if (isS) {
-                            marray.each(base.query(selector, this), function(c) {
-                                cc.push(c);
-                            });
+                            marray.merge(cc, base.query(selector, this));
                             return;
                         }
 
@@ -2429,16 +2392,17 @@
                 var childs = this.children || this.childNodes || [];
 
                 if (selector) {
-                    var ps = base.query(selector, this),
-                        a = function(c) {
-                            marray.each(ps, function(v) {
-                                if (v === c) {
-                                    cc.push(c);
-                                    return false;
-                                }
-                            });
-                            return true;
-                        };
+                    var ps = base.query(selector, this);
+
+                    function a(c) {
+                        marray.each(ps, function(v) {
+                            if (v === c) {
+                                cc.push(c);
+                                return false;
+                            }
+                        });
+                        return true;
+                    }
                 }
 
                 marray.each(childs, function(c) {
@@ -2448,36 +2412,43 @@
             return new _M_(cc);
         },
 
-        ///检索父节点，只会检索第一个匹配结果
+        ///检索元素（第一个元素）父节点
         parent: function() {
-            var e = this[0];
-            return new _M_(e && e.parentNode);
+            return new _M_(this[0] && this[0].parentNode);
         },
 
-        ///检索DOM各元素或指定元素的父节点
+        ///检索元素（第一个元素）的所有或指定的祖先（往上遍寻父级）
         parents: function(selector) {
-            var cc = [];
-            this.each(function() {
-                var f = new _M_(this).parent();
-                selector && (f = f.filter(selector));
-                marray.contains(cc, f[0]) || cc.push(f[0]);
-            });
+            var cc = [],
+                e = this[0];
+            if (e) {
+                e = e.parentNode;
+                while (e && base.isDomElement(e)) {
+                    if (selector) {
+                        My(e.parentNode).children(selector).length && (cc[cc.length++] = e);
+                        e = e.parentNode;
+                        continue;
+                    }
+
+                    cc[cc.length++] = e;
+                    e = e.parentNode;
+                }
+            }
             return new _M_(cc);
         },
 
         ///将目标元素插入到DOM各元素子节点的头部，作为各元素的第一个子节点
         prepend: function(target) {
             if (target) {
-                base.isDomElement(target) && (target = My(target));
-                if (base.isMy(target)) {
-                    this.each(function(i) {
-                        var $ = i && target.clone(true) || target,
-                            _ = this;
-                        $.reach(function() {
-                            _.insertBefore(this, _.firstChild);
-                        });
+                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                target = My(target);
+                this.each(function(i) {
+                    var $ = i && target.clone(true) || target,
+                        _ = this;
+                    $.reach(function() {
+                        _.insertBefore(this, _.firstChild);
                     });
-                }
+                });
             }
             return this;
         },
@@ -2485,37 +2456,24 @@
         ///将本My对象中的所有元素按顺序插入到目标元素的头部，此方法与prepend方法刚好是反过来的关系
         prependTo: function(target) {
             if (target) {
-                base.isDomElement(target) && (target = My(target));
-
-                var cc = [];
-                if (base.isMy(target)) {
-                    var that = this;
-                    target.each(function(i) {
-                        var $ = i && that.clone(true) || that,
-                            _ = this;
-                        $.each(function() {
-                            _.insertBefore(this, _.firstChild);
-                            cc.push(this);
-                        });
-                    });
-                }
+                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                My(target).prepend(this);
             }
-            return new _M_(cc);
+            return this;
         },
 
         ///将目标元素插入到DOM各元素子节点的尾部，作为各元素的最后一个子节点
         append: function(target) {
             if (target) {
-                base.isDomElement(target) && (target = My(target));
-                if (base.isMy(target)) {
-                    this.each(function(i) {
-                        var $ = i && target.clone(true) || target,
-                            _ = this;
-                        $.reach(function() {
-                            _.appendChild(this);
-                        });
+                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                target = My(target);
+                this.each(function(i) {
+                    var $ = i && target.clone(true) || target,
+                        _ = this;
+                    $.reach(function() {
+                        _.appendChild(this);
                     });
-                }
+                });
             }
             return this;
         },
@@ -2523,36 +2481,33 @@
         ///将本My对象中的所有元素按顺序插入到目标元素的尾部，此方法与append方法刚好是反过来的关系
         appendTo: function(target) {
             if (target) {
-                base.isDomElement(target) && (target = My(target));
-                var cc = [];
-                if (base.isMy(target)) {
-                    var that = this;
-                    target.each(function(i) {
-                        var $ = i && that.clone(true) || that,
-                            _ = this;
-                        $.each(function() {
-                            _.appendChild(this);
-                            cc.push(this);
-                        });
-                    });
-                }
+                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                My(target).append(this);
             }
-            return new _M_(cc);
+            return this;
         },
 
         ///将目标元素插入到各元素的前面
         before: function(target) {
             if (target) {
-                base.isDomElement(target) && (target = My(target));
-                if (base.isMy(target)) {
-                    this.each(function(i) {
-                        var $ = i && target.clone(true) || target,
-                            _ = this;
-                        $.reach(function() {
-                            _.parentNode.insertBefore(this, _);
-                        });
+                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                target = My(target);
+                this.each(function(i) {
+                    var $ = i && target.clone(true) || target,
+                        _ = this;
+                    $.reach(function() {
+                        _.parentNode.insertBefore(this, _);
                     });
-                }
+                });
+            }
+            return this;
+        },
+
+        ///将本My对象中的所有元素按顺序插入到目标元素的前面，此方法与before方法刚好是反过来的关系
+        insertBefore: function(target) {
+            if (target) {
+                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                My(target).before(this);
             }
             return this;
         },
@@ -2560,16 +2515,24 @@
         ///将目标元素插入到各元素的后面
         after: function(target) {
             if (target) {
-                base.isDomElement(target) && (target = My(target));
-                if (base.isMy(target)) {
-                    this.each(function(i) {
-                        var $ = i && target.clone(true) || target,
-                            _ = this;
-                        $.reach(function() {
-                            _.parentNode.insertBefore(this, _.nextSibling);
-                        });
+                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                target = My(target);
+                this.each(function(i) {
+                    var $ = i && target.clone(true) || target,
+                        _ = this;
+                    $.reach(function() {
+                        _.parentNode.insertBefore(this, _.nextSibling);
                     });
-                }
+                });
+            }
+            return this;
+        },
+
+        ///将本My对象中的所有元素按顺序插入到目标元素的后面，此方法与after方法刚好是反过来的关系
+        insertAfter: function(target) {
+            if (target) {
+                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                My(target).after(this);
             }
             return this;
         },
@@ -2578,24 +2541,30 @@
         replace: function(target) {
             var cc = [];
             if (target) {
-                mstring.isString(target) && (target = base.parseHTML(target));
-                base.isDomElement(target) && (target = My(target));
-                if (base.isMy(target)) {
-                    this.each(function(i) {
-                        var $ = i && target.clone(true) || target,
-                            _ = this,
-                            p = this.parentNode;
-                        p && $.reach(function() {
-                            var f = p.replaceChild(this, _);
-                            f && (cc.push(f));
-                        });
+                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                target = My(target);
+                this.each(function(i) {
+                    var $ = i && target.clone(true) || target,
+                        _ = this,
+                        p = this.parentNode;
+                    p && $.reach(function() {
+                        var f = p.replaceChild(this, _);
+                        f && (cc.push(f));
                     });
-                }
+                });
             }
             return new _M_(cc);
         },
 
-        ///对DOM中各元素执行删除操作
+        replaceTo: function(target) {
+            if (target) {
+                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                My(target).replace(this);
+            }
+            return this;
+        },
+
+        ///对DOM中各元素执行删除操作，不删除绑定的事件和数据
         remove: function(selector) {
             var cc = [];
             this.each(function() {
@@ -2624,13 +2593,14 @@
             this.release();
         },
 
+        ///检索前一个兄弟元素
         prev: function(selector) {
             var cc = [];
             this.each(function() {
                 if (!selector) {
                     var p = getPreviousSibling(this);
                     p && cc.push(p);
-                    return false;
+                    return;
                 }
 
                 var $ = new _M_(this.parentNode).children(selector);
@@ -2639,43 +2609,42 @@
                     do {
                         p = getPreviousSibling(p);
                     } while (p && !$.has(p));
-                    p && cc.push(p);
+                    p && cc.indexOf(p) === -1 && cc.push(p);
                 }
             });
             return new _M_(cc);
         },
 
+        ///检索所有前面兄弟元素
         prevAll: function(selector) {
             var cc = [];
             this.each(function() {
-                if (!selector) {
-                    var p = this;
+                function iterate(p) {
                     do {
                         p = getPreviousSibling(p);
-                        p && cc.indexOf(p) === -1 && cc.push(p);
+                        p && (selector ? $.has(p) : true) && cc.indexOf(p) === -1 && cc.push(p);
                     } while (p);
-                    return false;
+                }
+
+                if (!selector) {
+                    iterate(this);
+                    return;
                 }
 
                 var $ = new _M_(this.parentNode).children(selector); //因为所有兄弟节点都拥有共同的父节点，所以只需取得一次就可以了
-                if ($.length) {
-                    var p = this;
-                    do {
-                        p = getPreviousSibling(p);
-                        p && $.has(p) && cc.indexOf(p) === -1 && cc.push(p);
-                    } while (p);
-                }
+                $.length && iterate(this);
             });
             return new _M_(cc);
         },
 
+        ///检索后一个兄弟元素
         next: function(selector) {
             var cc = [];
             this.each(function() {
                 if (!selector) {
                     var n = getNextSibling(this);
                     n && cc.push(n);
-                    return false;
+                    return;
                 }
 
                 var $ = new _M_(this.parentNode).children(selector);
@@ -2684,43 +2653,67 @@
                     do {
                         n = getNextSibling(n);
                     } while (n && !$.has(n));
-                    n && cc.push(n);
+                    n && cc.indexOf(n) === -1 && cc.push(n);
                 }
             });
             return new _M_(cc);
         },
 
+        ///检索所有后面兄弟元素
         nextAll: function(selector) {
             var cc = [];
             this.each(function() {
-                if (!selector) {
-                    var n = this;
+                function iterate(n) {
                     do {
                         n = getNextSibling(n);
-                        n && cc.indexOf(n) === -1 && cc.push(n);
+                        n && (selector ? $.has(n) : true) && cc.indexOf(n) === -1 && cc.push(n);
                     } while (n);
-                    return false;
+                }
+
+                if (!selector) {
+                    iterate(this);
+                    return;
                 }
 
                 var $ = new _M_(this.parentNode).children(selector); //因为所有兄弟节点都拥有共同的父节点，所以只需取得一次就可以了
-                if ($.length) {
-                    var n = this;
-                    do {
-                        n = getNextSibling(n);
-                        n && $.has(n) && cc.indexOf(n) === -1 && cc.push(n);
-                    } while (n);
-                }
+                $.length && iterate(this);
             });
             return new _M_(cc);
         },
 
-        clone: function(isdepth) {
+        ///检索所有兄弟元素
+        siblings: function(selector) {
             var cc = [];
-            base.isDefined(isdepth) || (isdepth = false);
             this.each(function() {
-                cc.push(this.cloneNode(isdepth));
+                function iterate(n) {
+                    var p = n;
+                    do {
+                        p = getPreviousSibling(p);
+                        p && (selector ? $.has(p) : true) && cc.indexOf(p) === -1 && cc.push(p);
+                    } while (p);
+
+                    do {
+                        n = getNextSibling(n);
+                        n && (selector ? $.has(n) : true) && cc.indexOf(n) === -1 && cc.push(n);
+                    } while (n);
+                }
+
+                if (!selector) {
+                    iterate(this);
+                    return;
+                }
+
+                var $ = new _M_(this.parentNode).children(selector); //因为所有兄弟节点都拥有共同的父节点，所以只需取得一次就可以了
+                $.length && iterate(this);
             });
             return new _M_(cc);
+        },
+
+        ///复制元素节点，isdepth：指示被复制的节点是否包括原节点的所有属性和子节点
+        clone: function(isdepth) {
+            return new _M_(this.map(function() {
+                return this.cloneNode(isdepth);
+            }));
         },
 
         ///innerHTML
@@ -2747,8 +2740,9 @@
             return this;
         },
 
+        ///textContent
         text: function(txt) {
-            if (txt === undefined) { //检索
+            if (txt === undefined) {
                 var e = this[0];
                 return e && e.textContent || '';
             }
@@ -2773,7 +2767,7 @@
                         var r = [];
                         for (var k = 0, l = e.length, opt; k < l; k++) {
                             opt = e.options[k];
-                            opt.selected && r.push(opt.text);
+                            opt.selected && r.push(opt.value);
                         }
                         return r;
                     }
@@ -2791,7 +2785,7 @@
                         } else if (this.tagName === es[2] && this.multiple) { //多选列表
                             for (var j = 0, l = this.length, opt; j < l; j++) {
                                 opt = this.options[j];
-                                opt.selected = v.indexOf(opt.text) > -1;
+                                opt.selected = v.indexOf(opt.value) > -1;
                             }
                         } else this.value = v[0];
                     } else this.value = v;
@@ -2803,17 +2797,17 @@
 
         /*
          *设置或检索DOM元素的属性值
-         *此方法有修正checked/selected/disabled/required/readonly这样的属性，不论设置true或checked/selected/disabled/enabled/required/readonly都可以生效，false或''同理，当是检索行为，只会返回true或false
+         *此方法有修正checked/selected/disabled/required/readonly/draggable这样的属性，不论设置true或checked/selected/disabled/enabled/required/readonly都可以生效，false或''同理，当是检索行为，只会返回true或false
          */
         attr: function(name, value) {
             var isp = mobject.isPlainObject(name),
-                isPro = ['checked', 'selected', 'disabled', 'enabled', 'required', 'readonly'].indexOf(name) > -1;
+                pros = ['checked', 'selected', 'disabled', 'enabled', 'required', 'readonly', 'draggable'];
 
             if (base.isUndefined(value) && !isp) {
                 var e = this[0];
                 if (e) {
                     fn = function(name) {
-                        return isPro ? (name === 'enabled' ? !e['disabled'] : e[name]) : e.getAttribute(name)
+                        return marray.contains(pros, name) ? (name === 'enabled' ? e.getAttribute('disabled') == null : e.getAttribute(name) != null) : e.getAttribute(name);
                     }
 
                     if (mstring.isString(name))
@@ -2831,6 +2825,7 @@
             var ns = name;
             isp || (ns = {}, ns[name] = value);
             mobject.each.call(this, ns, function(v, n) {
+                var isPro = marray.contains(pros, n);
                 this.each(function() {
                     if (isPro) {
                         if (typeof v === 'boolean' || v === n || v === '') {
@@ -2843,7 +2838,7 @@
                         return;
                     }
                     this.setAttribute(n, v);
-                })
+                });
             });
             return this;
         },
@@ -2858,6 +2853,7 @@
             return this;
         },
 
+        ///设置自定义数据
         data: function(name, value) {
             var isp = mobject.isPlainObject(name);
 
@@ -3626,11 +3622,9 @@
         ///设值，参数key同get方法，派发change事件
         set: function(key, value) {
             function trigger(obj, key) {
-                obj.trigger('change:' + key);
-                obj.trigger('change');
+                obj.trigger('change:' + key).trigger('change');
                 if (obj.__owner && obj.__owner instanceof base.Dispatcher) {
-                    obj.__owner.trigger('change:' + key);
-                    obj.__owner.trigger('change');
+                    obj.__owner.trigger('change:' + key).trigger('change');
                 }
             }
 
