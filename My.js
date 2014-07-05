@@ -2556,10 +2556,29 @@
             return new _M_(cc);
         },
 
+        ///将本My对象中的元素替换给目标元素，此方法与replace方法刚好是反过来的关系
         replaceTo: function(target) {
             if (target) {
                 mhtml.isHTML(target) && (target = base.parseHTML(target));
                 My(target).replace(this);
+            }
+            return this;
+        },
+
+        ///将元素与指定的元素互换位置
+        swap: function(target) {
+            if (target) {
+                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                target = My(target);
+
+                var l = this.length;
+                this.each(function(i) {
+                    var prev = getPreviousSibling(this),
+                        p = this.parentNode;
+                    var $ = i == l - 1 && target || target.clone(true);
+                    target.before(this);
+                    prev && $.insertAfter(prev) || $.appendTo(p);
+                });
             }
             return this;
         },
