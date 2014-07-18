@@ -651,7 +651,7 @@
         size: function(obj) {
             var l = 0;
             for (var k in obj) l++
-            return l;
+                return l;
         },
 
         equals: function(obj1, obj2) {
@@ -3569,7 +3569,8 @@
                             target[mothed](p);
                         }
                         pre = cur;
-                    }, onup = function(e) {
+                    },
+                    onup = function(e) {
                         My(document.body).off('mousemove', onmove).off('mouseup', onup).off('mouseleave', onup);
                         target = null;
                         pre = null;
@@ -3952,6 +3953,44 @@
             return this;
         }
     });
+
+
+    ///包装canvas的绘制函数，返回一个包装器，以支持链式调用，同时支持包装器卸载
+    base.plugin('canvas', {
+        wrap: function(canvas) {
+            var obj = {
+                unwrap: function() {
+                    for (var k in this) delete this[k];
+                },
+                attr: function(name, value) {
+                    if (this.ctx) {
+                        var as = name;
+                        mstring.isString(name) && (as = {}, as[name] = value);
+                        for (var k in as) this.ctx[k] = as[k];
+                    }
+                    return this;
+                }
+            };
+
+            mstring.isString(canvas) && (canvas = base.query(canvas)[0]);
+            if (canvas && canvas.tagName === 'CANVAS') {
+                var ctx = canvas.getContext('2d');
+                for (var k in ctx) {
+                    if (typeof ctx[k] === 'function') {
+                        var fn = function() {
+                            this.ctx[arguments.callee.method].apply(this.ctx, arguments);
+                            return this;
+                        }
+                        fn.method = k;
+                        obj[k] = fn;
+                    }
+                }
+                obj.ctx = ctx;
+            }
+            return obj;
+        }
+    });
+
 
     base.extend(My, base);
 

@@ -8,6 +8,7 @@
   	<div><a href="">11111</a></div>
     <div><a href="">22222</a></div>
     <div id="formbox"></div>
+    <canvas id="mycanvas" style="border:1px solid #c3c3c3;">哈哈哈哈哈</canvas>
   </body>
   <script type="text/javascript">
     var provider = new My.DataProvider([
@@ -47,5 +48,9 @@
     });
 
     var hv = new HomeView('#formbox', home);
+
+    M.canvas.wrap('#mycanvas').attr({
+        'fillStyle': '#FF0000'
+    }).beginPath().arc(70, 18, 15, 0, Math.PI * 2, true).closePath().fill().unwrap();
   </script>
 </html>
