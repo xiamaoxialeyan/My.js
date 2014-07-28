@@ -8,8 +8,9 @@ var url = require('url');
 var fs = require('fs');
 var mine = require('./mine').types;
 var path = require('path');
+var vhost = require('vhost');
 
-http.createServer(function(req, res) {
+var server = http.createServer(function(req, res) {
     var pathname = url.parse(req.url).pathname;
     pathname && (pathname = pathname.slice(1));
     console.log(pathname);
@@ -41,5 +42,8 @@ http.createServer(function(req, res) {
             });
         }
     });
-}).listen(8080, 'localhost');
-console.log('Server running at http://localhost:8080');
+}).listen(8080, 'lib.dodo.com.cn');
+
+vhost('lib.dodo.com.cn', server);
+
+console.log('Server running at http://lib.dodo.com.cn:8080');

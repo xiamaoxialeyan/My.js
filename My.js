@@ -273,7 +273,7 @@
                         dest[key] = value;
                     });
                 }, 1);
-                return this;
+                return dest;
             },
 
             augment: function(dest, source, methods) {
@@ -1228,6 +1228,11 @@
                 ret.isEMail = ret.protocol === 'mailto';
             }
             return ret;
+        },
+
+        packageURL: function(url, params) {
+            mobject.isPlainObject(params) && (params = this.joinURL(params));
+            return url + (/\?/.test(url) ? '&' : '?') + params;
         },
 
         toLink: function(url, text, target) {
@@ -3614,7 +3619,7 @@
             return new base.DataProvider(source);
 
         base.Dispatcher.call(this);
-        this.__source = marray.isArray(source) && source || [source];
+        this.__source = source ? (marray.isArray(source) && source || [source]) : [];
     }
 
     base.inherit(base.DataProvider, base.Dispatcher, {
@@ -3731,6 +3736,15 @@
             return base.isDefined(this.get(key));
         },
 
+        ///检测数据源中是否存在指定数据项
+        find: function(item) {
+            for (var i = 0, l = this.__source.length; i < l; i++) {
+                if (this.__source[i] === item)
+                    return true;
+            }
+            return false;
+        },
+
         ///清空数据源，派发clear事件
         clear: function() {
             this.__source = [];
@@ -3755,6 +3769,10 @@
                 res[key] = this.get(key);
             }, null, this);
             return res;
+        },
+
+        isEmpty: function() {
+            return !this.__source.length;
         }
     });
 
@@ -3793,6 +3811,10 @@
             return this.provider.has(key);
         },
 
+        find: function(item) {
+            return this.provider.find(item);
+        },
+
         clear: function() {
             this.provider.clear();
             return this;
@@ -3806,8 +3828,17 @@
             return this.provider.pick.apply(this.provider, arguments);
         },
 
+        isEmpty: function() {
+            return this.provider.isEmpty();
+        },
+
         ///load数据之前，有一次机会设定loader的参数
-        beforeLoad: function(loader) {},
+        loadbefore: function(loader) {},
+
+        ///load数据完毕之后，有一次机会设定请求结果，因为load过来的数据也许并非我们所需要的，该函数就提供了一次整理数据的机会
+        loadafter: function(result) {
+            return result;
+        },
 
         ///从远程服务器获取数据，并更新模型的数据
         load: function() {
@@ -3816,6 +3847,7 @@
             loader.url = this.url;
             loader.once({
                 success: function(data) {
+                    data = _.loadafter(this.data);
                     data && _.reset(data, true);
                     _.trigger('load');
                     this.release();
@@ -3829,12 +3861,17 @@
                     this.release();
                 }
             });
-            this.beforeLoad(loader);
+            this.loadbefore(loader);
             loader.send();
         },
 
         ///commit数据之前，有一次机会设定loader的参数
-        beforeCommit: function(loader) {},
+        commitbefore: function(loader) {},
+
+        ///commit数据完毕之后，有一次机会设定响应结果，因为这个响应结果也许并非我们所需要的，该函数就提供了一次整理结果的机会
+        loadafter: function(result) {
+            return result;
+        },
 
         ///提交模型数据到远程服务器
         commit: function() {
@@ -3845,7 +3882,7 @@
             loader.params = this.toSource();
             loader.once({
                 success: function(data) {
-                    _.trigger('commit');
+                    _.trigger('commit', _.loadafter(this.data));
                     this.release();
                 },
                 fail: function() {
@@ -3857,19 +3894,24 @@
                     this.release();
                 }
             });
-            this.beforeCommit(loader);
+            this.commitbefore(loader);
             loader.send();
         },
 
         clone: function() {
             return new base.Model(this.url, this.toSource());
+        },
+
+        render: function() {
+            this.trigger('render');
+            return this;
         }
     });
 
     ///UI视图
     base.View = function(el, model) {
         if (!(this instanceof base.View))
-            return new base.View(model);
+            return new base.View(el, model);
 
         base.Dispatcher.call(this);
         this.ui = My(el);
@@ -3877,10 +3919,18 @@
         this.initialize();
         this.render();
         this.delegate();
+
+        var _ = this;
+        this.model && this.model.on('render', function() {
+            _.render();
+        });
     }
 
     base.View.extend = function(obj) {
         function NView(el, model) {
+            if (!(this instanceof NView))
+                return new NView(el, model);
+
             base.View.call(this, el, model);
         }
         base.inherit(NView, base.View, obj);
@@ -3905,15 +3955,22 @@
         },
 
         template: function() {
-            return base.template(this.tpl, this.model.toSource());
+            return base.template(this.tpl, this.model && this.model.toSource() || []);
         },
 
+        renderbefore: function() {},
+
         render: function() {
+            this.renderbefore();
             this.ui.html(this.template());
+            this.renderafter();
             return this;
         },
 
+        renderafter: function() {},
+
         remove: function() {
+            this.model && this.model.release();
             this.release();
             this.undelegate();
             this.ui && this.ui.remove();
