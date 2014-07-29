@@ -16,7 +16,7 @@
     }
 
     My.name = 'My';
-    My.version = '1.0.0';
+    My.version = '1.0.1';
     My.isReady = false;
     window.M = window.My = My;
 
@@ -351,6 +351,7 @@
                 });
 
                 loader.send();
+
                 return {
                     success: function(fn) {
                         opts.success = fn;
@@ -399,7 +400,8 @@
             stringify: function(data, type) {
                 return {
                     json: JSON.stringify(data),
-                    xml: this.serializeXML(data)
+                    xml: this.serializeXML(data),
+                    html: mhtml.stringify(data)
                 }[type || 'json'];
             },
 
@@ -407,7 +409,7 @@
                 return {
                     json: JSON.parse(data),
                     xml: this.parseXML(data),
-                    html: this.parseHTML(data)
+                    html: mhtml.parse(data)
                 }[type || 'json'];
             },
 
@@ -1111,8 +1113,7 @@
         }
     };
 
-    base.extend(base, mnumber);
-    base.extend(base, mdate);
+    base.extend(base, mnumber, mdate);
 
     base.augment(base, mstring, ['isString', 'ltrim', 'rtrim', 'trim', 'trimAll', 'camelCase', 'joinCase']);
     base.augment(base, mobject, ['isPlainObject']);
@@ -1121,20 +1122,20 @@
 
     ///针对HTML内容的一些操作方法
     var mhtml = {
-        encodeHTML: function(s) {
+        encode: function(s) {
             return (s || '').replace(/&/g, '&amp;').replace(/\</g, '&lt;').replace(/\>/g, '&gt;').replace(/ /g, '&nbsp;');
         },
 
-        decodeHTML: function(s) {
+        decode: function(s) {
             return (s || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ');
         },
 
-        isHTML: function(s) {
-            var h = this.parseHTML(s);
+        is: function(s) {
+            var h = this.parse(s);
             return h != null && h.length;
         },
 
-        parseHTML: function(s) {
+        parse: function(s) {
             if (!mstring.isString(s))
                 return null;
 
@@ -1147,35 +1148,45 @@
                 dom = null;
             }
             return new _M_(dom);
+        },
+
+        stringify: function(dom) {
+            if (dom === document)
+                return base.serializeXML(dom);
+
+            if (base.isDomElement(dom))
+                return dom.outerHTML;
+
+            return '';
         }
     };
 
-    base.extend(base, mhtml);
+    base.plugin('html', mhtml);
 
     ///针对URL的一些操作方法
     var murl = {
-        joinURL: function(obj, join, encode) {
+        join: function(obj, delimiter, encode) {
             if (!mobject.isPlainObject(obj))
                 return '';
 
-            join || (join = '&');
+            delimiter || (delimiter = '&');
 
             var s = '';
             mobject.each(obj, function(v, k) {
                 s += (k + '=' + (encode && encodeURIComponent(v) || v));
-                s += join;
+                s += delimiter;
             });
-            s = s.substring(0, s.length - join.length);
+            s = s.substring(0, s.length - delimiter.length);
             return s;
         },
 
-        splitURL: function(url, split, decode) {
+        split: function(url, delimiter, decode) {
             if (!mstring.isString(url))
                 return null;
 
-            split || (split = '&');
+            delimiter || (delimiter = '&');
 
-            var arr = url.split(split),
+            var arr = url.split(delimiter),
                 a, obj = {};
             marray.each(arr, function(v, i) {
                 a = v.split('=');
@@ -1184,7 +1195,7 @@
             return obj;
         },
 
-        parseURL: function(url) {
+        parse: function(url) {
             var ret = {
                 ///协议
                 protocol: '',
@@ -1230,8 +1241,8 @@
             return ret;
         },
 
-        packageURL: function(url, params) {
-            mobject.isPlainObject(params) && (params = this.joinURL(params));
+        marry: function(url, params) {
+            mobject.isPlainObject(params) && (params = this.join(params));
             return url + (/\?/.test(url) ? '&' : '?') + params;
         },
 
@@ -1241,7 +1252,7 @@
         }
     };
 
-    base.extend(base, murl);
+    base.plugin('url', murl);
 
     ///16进制颜色值
     var regHex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i,
@@ -1356,7 +1367,7 @@
         }
     };
 
-    base.plugin('Color', mcolor);
+    base.plugin('color', mcolor);
 
     ///定义事件类型（包含原生的DOM事件类型和已知的自定义事件类型）
     var eventType = {},
@@ -1920,7 +1931,7 @@
             };
 
             initializeLoader(this);
-            this.requester.send(this.method === 'POST' && (mobject.isPlainObject(this.params) && murl.joinURL(this.params, '&', true) || this.params || ''));
+            this.requester.send(this.method === 'POST' && (mobject.isPlainObject(this.params) && murl.join(this.params, '&', true) || this.params || ''));
         },
 
         abort: function() {
@@ -2218,7 +2229,7 @@
                 this[0] = s;
                 this.length = 1;
             } else if (mstring.isString(s)) {
-                insertElements(mhtml.isHTML(s) ? mhtml.parseHTML(s) : base.query(s, p), this);
+                insertElements(mhtml.is(s) ? mhtml.parse(s) : base.query(s, p), this);
             } else if (marray.isArray(s) || marray.isArrayLike(s)) {
                 insertElements(s, this);
             }
@@ -2445,7 +2456,7 @@
         ///将目标元素插入到DOM各元素子节点的头部，作为各元素的第一个子节点
         prepend: function(target) {
             if (target) {
-                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                mhtml.is(target) && (target = mhtml.parse(target));
                 target = My(target);
                 this.each(function(i) {
                     var $ = i && target.clone(true) || target,
@@ -2461,7 +2472,7 @@
         ///将本My对象中的所有元素按顺序插入到目标元素的头部，此方法与prepend方法刚好是反过来的关系
         prependTo: function(target) {
             if (target) {
-                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                mhtml.is(target) && (target = mhtml.parse(target));
                 My(target).prepend(this);
             }
             return this;
@@ -2470,7 +2481,7 @@
         ///将目标元素插入到DOM各元素子节点的尾部，作为各元素的最后一个子节点
         append: function(target) {
             if (target) {
-                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                mhtml.is(target) && (target = mhtml.parse(target));
                 target = My(target);
                 this.each(function(i) {
                     var $ = i && target.clone(true) || target,
@@ -2486,7 +2497,7 @@
         ///将本My对象中的所有元素按顺序插入到目标元素的尾部，此方法与append方法刚好是反过来的关系
         appendTo: function(target) {
             if (target) {
-                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                mhtml.is(target) && (target = mhtml.parse(target));
                 My(target).append(this);
             }
             return this;
@@ -2495,7 +2506,7 @@
         ///将目标元素插入到各元素的前面
         before: function(target) {
             if (target) {
-                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                mhtml.is(target) && (target = mhtml.parse(target));
                 target = My(target);
                 this.each(function(i) {
                     var $ = i && target.clone(true) || target,
@@ -2511,7 +2522,7 @@
         ///将本My对象中的所有元素按顺序插入到目标元素的前面，此方法与before方法刚好是反过来的关系
         insertBefore: function(target) {
             if (target) {
-                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                mhtml.is(target) && (target = mhtml.parse(target));
                 My(target).before(this);
             }
             return this;
@@ -2520,7 +2531,7 @@
         ///将目标元素插入到各元素的后面
         after: function(target) {
             if (target) {
-                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                mhtml.is(target) && (target = mhtml.parse(target));
                 target = My(target);
                 this.each(function(i) {
                     var $ = i && target.clone(true) || target,
@@ -2536,7 +2547,7 @@
         ///将本My对象中的所有元素按顺序插入到目标元素的后面，此方法与after方法刚好是反过来的关系
         insertAfter: function(target) {
             if (target) {
-                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                mhtml.is(target) && (target = mhtml.parse(target));
                 My(target).after(this);
             }
             return this;
@@ -2546,7 +2557,7 @@
         replace: function(target) {
             var cc = [];
             if (target) {
-                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                mhtml.is(target) && (target = mhtml.parse(target));
                 target = My(target);
                 this.each(function(i) {
                     var $ = i && target.clone(true) || target,
@@ -2564,7 +2575,7 @@
         ///将本My对象中的元素替换给目标元素，此方法与replace方法刚好是反过来的关系
         replaceTo: function(target) {
             if (target) {
-                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                mhtml.is(target) && (target = mhtml.parse(target));
                 My(target).replace(this);
             }
             return this;
@@ -2573,7 +2584,7 @@
         ///将元素与指定的元素互换位置
         swap: function(target) {
             if (target) {
-                mhtml.isHTML(target) && (target = base.parseHTML(target));
+                mhtml.is(target) && (target = mhtml.parse(target));
                 target = My(target);
 
                 var l = this.length;
@@ -3777,17 +3788,41 @@
     });
 
     ///数据模型
-    base.Model = function(url, provider) {
+    base.Model = function(url, attrs, provider) {
         if (!(this instanceof base.Model))
-            return new base.Model(url, provider);
+            return new base.Model(url, attrs, provider);
 
         base.Dispatcher.call(this);
         this.url = url;
+        this.attrs = attrs || {};
         this.provider = provider instanceof base.DataProvider && provider || new base.DataProvider(provider);
         this.provider.owner(this);
     }
 
     base.inherit(base.Model, base.Dispatcher, {
+        attr: function(key, val) {
+            if (base.isUndefined(key)) return this.attrs;
+
+            var iss = mstring.isString(key);
+
+            if (iss && base.isUndefined(val)) return this.attrs[key];
+
+            var ks = key;
+            iss && (ks = {}, ks[key] = val);
+
+            var changed = false,
+                _ = this;
+            mobject.each(ks, function(v, k) {
+                var old = _.attrs[k];
+                if (old !== v) {
+                    _.attrs[k] = v;
+                    _.trigger('attr:' + k, v);
+                    changed = true;
+                }
+            });
+            changed && this.trigger('attr');
+        },
+
         get: function(key) {
             return this.provider.get(key);
         },
@@ -3899,7 +3934,7 @@
         },
 
         clone: function() {
-            return new base.Model(this.url, this.toSource());
+            return new base.Model(this.url, this.attrs, this.toSource());
         },
 
         render: function() {
