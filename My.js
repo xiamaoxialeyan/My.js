@@ -3421,7 +3421,7 @@
             }
 
             var ts = '';
-            mstring.isString(name) && (ts = mstring.joinCase(name) + ':' + value); //wordWord先转成word-word
+            mstring.isString(name) && (ts = mstring.joinCase(name) + ':' + addPxUnit(value)); //wordWord先转成word-word
 
             if (marray.isArray(name) && marray.isArray(value)) {
                 ts = marray.map(name, function(n, i) {
@@ -4016,14 +4016,13 @@
             if (this.events) {
                 mobject.each(this.events, function(h, k) {
                     k = k.replace(/\s+/, ' ').split(' ');
-                    if (k.length >= 2) {
-                        var ty = k.shift(),
-                            c = mstring.contains(ty, '?'),
-                            m = c && 'once' || 'on'; //当有?标记，则表示once事件
-                        c && (ty = ty.slice(0, ty.length - 1));
-                        k = k.join(' ');
-                        My(k, this.ui)[m](ty, h, this);
-                    }
+
+                    var ty = k.shift(),
+                        c = mstring.contains(ty, '?'),
+                        m = c && 'once' || 'on'; //当有?标记，则表示once事件
+                    c && (ty = ty.slice(0, ty.length - 1));
+                    k = k && k.join(' ') || this.ui;
+                    My(k, this.ui)[m](ty, h, this);
                 }, null, this);
             }
             return this;
@@ -4033,13 +4032,12 @@
             if (this.events) {
                 mobject.each(this.events, function(h, k) {
                     k = k.replace(/\s+/, ' ').split(' ');
-                    if (k.length >= 2) {
-                        var ty = k.shift(),
-                            c = mstring.contains(ty, '?');
-                        c && (ty = ty.slice(0, ty.length - 1));
-                        k = k.join(' ');
-                        My(k, this.ui).off(ty, h);
-                    }
+
+                    var ty = k.shift(),
+                        c = mstring.contains(ty, '?');
+                    c && (ty = ty.slice(0, ty.length - 1));
+                    k = k && k.join(' ') || this.ui;
+                    My(k, this.ui).off(ty, h);
                 }, null, this);
             }
             return this;
