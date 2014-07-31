@@ -245,23 +245,22 @@
                     return mobject.merge(dest, source);
             },
 
-            inherit: function(subCls, superCls, args) {
-                function F() {};
-                F.prototype = superCls.prototype;
+            inherit: function(subClass, superClass, args) {
+                superClass.prototype.constructor === Object.prototype.constructor && (superClass.prototype.constructor = superClass);
 
-                var prot = new F();
-                prot.constructor = subCls;
+                function F() {};
+                F.prototype = superClass.prototype;
+
+                var instance = new F();
+                instance.constructor = subClass;
+                subClass.prototype = instance;
 
                 args = slice.call(arguments);
                 marray.each(args, function(v) {
                     mobject.each(v, function(value, key) {
-                        prot[key] = value;
+                        instance[key] = value;
                     });
                 }, 2);
-
-                subCls.prototype = prot;
-                subCls.superCls = superCls.prototype;
-                superCls.prototype.constructor === Object.prototype.constructor && (superCls.prototype.constructor = superCls);
                 return this;
             },
 
@@ -315,10 +314,10 @@
 
                 var loader = null;
                 if (opts.jsonp) {
-                    loader = new base.JSONPer();
+                    loader = new JSONPer();
                     loader.callback = opts.callback || this.ajaxSettings.callback;
                 } else {
-                    loader = new base.Loader();
+                    loader = new Loader();
                     opts.header && loader.beforeSend(opts.header);
                     loader.method = (opts.method || this.ajaxSettings.method).toUpperCase();
                     loader.params = opts.params || {};
@@ -1731,12 +1730,12 @@
     }
 
     ///自定义事件派发器，所有需要派发自定义事件的类都需要继承此事件派发器
-    base.Dispatcher = function() {
-        if (!(this instanceof base.Dispatcher))
-            return new base.Dispatcher();
+    function Dispatcher() {
+        if (!(this instanceof Dispatcher))
+            return new Dispatcher();
     }
 
-    base.Dispatcher.prototype = {
+    Dispatcher.prototype = {
         on: function(ty, fn, arg) {
             cevent.on(this, ty, fn, arg);
             return this;
@@ -1767,12 +1766,14 @@
         }
     }
 
-    ///计时器
-    base.Timer = function(delay, totalCount) {
-        if (!(this instanceof base.Timer))
-            return new base.Timer(delay, totalCount);
+    base.Dispatcher = Dispatcher;
 
-        base.Dispatcher.call(this); //继承派发器，拥有绑定、松绑和派发自定义事件的能力
+    ///计时器
+    function Timer(delay, totalCount) {
+        if (!(this instanceof Timer))
+            return new Timer(delay, totalCount);
+
+        Dispatcher.call(this); //继承派发器，拥有绑定、松绑和派发自定义事件的能力
         this.timer = -1; //计时器对象
         this.delay = delay || 0; //周期时间间隔(秒)
         this.curCount = 0; //当前已运行周期数
@@ -1780,7 +1781,7 @@
         this.running = false;
     };
 
-    base.inherit(base.Timer, base.Dispatcher, {
+    base.inherit(Timer, Dispatcher, {
         start: function() {
             if (this.timer === -1 && this.delay > 0) {
                 var _ = this;
@@ -1816,6 +1817,8 @@
             }
         }
     });
+
+    base.Timer = Timer;
 
     ///数据类型
     var dataType = {
@@ -1881,11 +1884,11 @@
     }
 
     ///数据加载器
-    base.Loader = function(url, opts) {
-        if (!(this instanceof base.Loader))
-            return new base.Loader(url, opts);
+    function Loader(url, opts) {
+        if (!(this instanceof Loader))
+            return new Loader(url, opts);
 
-        base.Dispatcher.call(this);
+        Dispatcher.call(this);
         opts = opts || {};
         this.url = url;
         this.method = (opts.method || base.ajaxSettings.method).toUpperCase();
@@ -1902,7 +1905,7 @@
         this.requester = new XMLHttpRequest();
     }
 
-    base.inherit(base.Loader, base.Dispatcher, {
+    base.inherit(Loader, Dispatcher, {
         ///发送请求之前唯一的机会来设置头部信息
         beforeSend: function(header) {
             mobject.isPlainObject(header) && (this.header = header);
@@ -1944,6 +1947,8 @@
             this.trigger('destroy', null, this);
         }
     });
+
+    base.Loader = Loader;
 
     function initializeLoader(loader) {
         loader.cache || loader.method !== 'GET' || (loader.url += (loader.url.indexOf('?') > -1 ? '&' : '?') + '_=' + base.now()); //在尾部加上日期毫秒数,保证不取缓存
@@ -2010,11 +2015,11 @@
     base.callbacks = {};
 
     ///JSONP加载器，跨域脚本请求
-    base.JSONPer = function(url, opts) {
-        if (!(this instanceof base.JSONPer))
-            return new base.JSONPer(url, opts);
+    function JSONPer(url, opts) {
+        if (!(this instanceof JSONPer))
+            return new JSONPer(url, opts);
 
-        base.Dispatcher.call(this);
+        Dispatcher.call(this);
         opts = opts || {};
         this.url = '';
         this.dataType = opts.dataType || base.ajaxSettings.dataType;
@@ -2030,7 +2035,7 @@
         this.timeoutWatcher = null; //超时计时器
     }
 
-    base.inherit(base.JSONPer, base.Dispatcher, {
+    base.inherit(JSONPer, Dispatcher, {
         send: function(url) {
             mstring.isEmpty(url) || (this.url = url);
 
@@ -2081,6 +2086,8 @@
             successed || this.trigger('destroy', null, this);
         }
     });
+
+    base.JSONPer = JSONPer;
 
     function setXssResult(xss, data) {
         if (xss.parse) {
@@ -3625,15 +3632,15 @@
     });
 
     ///数据提供者，监听数据的变化
-    base.DataProvider = function(source) {
-        if (!(this instanceof base.DataProvider))
-            return new base.DataProvider(source);
+    function DataProvider(source) {
+        if (!(this instanceof DataProvider))
+            return new DataProvider(source);
 
-        base.Dispatcher.call(this);
+        Dispatcher.call(this);
         this.__source = source ? (marray.isArray(source) && source || [source]) : [];
     }
 
-    base.inherit(base.DataProvider, base.Dispatcher, {
+    base.inherit(DataProvider, Dispatcher, {
         owner: function(o) {
             this.__owner = o;
             return this;
@@ -3659,7 +3666,7 @@
         set: function(key, value) {
             function trigger(obj, key) {
                 obj.trigger('change:' + key).trigger('change');
-                if (obj.__owner && obj.__owner instanceof base.Dispatcher) {
+                if (obj.__owner && obj.__owner instanceof Dispatcher) {
                     obj.__owner.trigger('change:' + key).trigger('change');
                 }
             }
@@ -3707,7 +3714,7 @@
             this.__source = source;
             if (!silent) {
                 this.trigger('change');
-                this.__owner && this.__owner instanceof base.Dispatcher && this.__owner.trigger('change');
+                this.__owner && this.__owner instanceof Dispatcher && this.__owner.trigger('change');
             }
             return this;
         },
@@ -3716,7 +3723,7 @@
         unset: function(key) {
             function trigger(obj, key) {
                 obj.trigger('unset', key);
-                obj.__owner && obj.__owner instanceof base.Dispatcher && obj.__owner.trigger('unset', key);
+                obj.__owner && obj.__owner instanceof Dispatcher && obj.__owner.trigger('unset', key);
             }
 
             if (mnumber.isNumber(key)) {
@@ -3760,7 +3767,7 @@
         clear: function() {
             this.__source = [];
             this.trigger('clear');
-            this.__owner && this.__owner instanceof base.Dispatcher && this.__owner.trigger('clear');
+            this.__owner && this.__owner instanceof Dispatcher && this.__owner.trigger('clear');
             return this;
         },
 
@@ -3770,7 +3777,7 @@
         },
 
         clone: function() {
-            return new base.DataProvider(this.toSource()).owner(this.__owner);
+            return new DataProvider(this.toSource()).owner(this.__owner);
         },
 
         ///从数据源中挑选出指定字段的值
@@ -3787,19 +3794,21 @@
         }
     });
 
-    ///数据模型
-    base.Model = function(url, attrs, provider) {
-        if (!(this instanceof base.Model))
-            return new base.Model(url, attrs, provider);
+    base.DataProvider = DataProvider;
 
-        base.Dispatcher.call(this);
+    ///数据模型
+    function Model(url, attrs, provider) {
+        if (!(this instanceof Model))
+            return new Model(url, attrs, provider);
+
+        Dispatcher.call(this);
         this.url = url;
         this.attrs = attrs || {};
-        this.provider = provider instanceof base.DataProvider && provider || new base.DataProvider(provider);
+        this.provider = provider instanceof DataProvider && provider || new DataProvider(provider);
         this.provider.owner(this);
     }
 
-    base.inherit(base.Model, base.Dispatcher, {
+    base.inherit(Model, Dispatcher, {
         attr: function(key, val) {
             if (base.isUndefined(key)) return this.attrs;
 
@@ -3833,7 +3842,7 @@
         },
 
         reset: function(provider, silent) {
-            this.provider.reset(provider instanceof base.DataProvider && provider.toSource() || provider, silent);
+            this.provider.reset(provider instanceof DataProvider && provider.toSource() || provider, silent);
             return this;
         },
 
@@ -3877,7 +3886,7 @@
 
         ///从远程服务器获取数据，并更新模型的数据
         load: function() {
-            var loader = new base.Loader(),
+            var loader = new Loader(),
                 _ = this;
             loader.url = this.url;
             loader.once({
@@ -3910,7 +3919,7 @@
 
         ///提交模型数据到远程服务器
         commit: function() {
-            var loader = new base.Loader(),
+            var loader = new Loader(),
                 _ = this;
             loader.url = this.url;
             loader.method = 'post';
@@ -3934,7 +3943,7 @@
         },
 
         clone: function() {
-            return new base.Model(this.url, this.attrs, this.toSource());
+            return new Model(this.url, this.attrs, this.toSource());
         },
 
         render: function() {
@@ -3943,12 +3952,14 @@
         }
     });
 
-    ///UI视图
-    base.View = function(el, model) {
-        if (!(this instanceof base.View))
-            return new base.View(el, model);
+    base.Model = Model;
 
-        base.Dispatcher.call(this);
+    ///UI视图
+    function View(el, model) {
+        if (!(this instanceof View))
+            return new View(el, model);
+
+        Dispatcher.call(this);
         this.ui = My(el);
         this.model = model;
         this.initialize();
@@ -3961,14 +3972,14 @@
         });
     }
 
-    base.View.extend = function(obj) {
+    View.extend = function(obj) {
         function NView(el, model) {
             if (!(this instanceof NView))
                 return new NView(el, model);
 
-            base.View.call(this, el, model);
+            View.call(this, el, model);
         }
-        base.inherit(NView, base.View, obj);
+        base.inherit(NView, View, obj);
         return NView;
     }
 
@@ -3984,7 +3995,7 @@
      *        render:function(){}
      *    })
      */
-    base.inherit(base.View, base.Dispatcher, {
+    base.inherit(View, Dispatcher, {
         initialize: function() {
             return this;
         },
@@ -4043,6 +4054,8 @@
             return this;
         }
     });
+
+    base.View = View;
 
 
     ///包装canvas的绘制函数，返回一个包装器，以支持链式调用，同时支持包装器卸载
