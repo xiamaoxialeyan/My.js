@@ -248,30 +248,36 @@
             inherit: function(subClass, superClass, args) {
                 superClass.prototype.constructor === Object.prototype.constructor && (superClass.prototype.constructor = superClass);
 
-                function F() {};
+                eval('var F=function ' + (subClass.name || 'F') + '() {}'); //使得原型链上的类名都是真实的，而不是F
                 F.prototype = superClass.prototype;
 
                 var instance = new F();
                 instance.constructor = subClass;
                 subClass.prototype = instance;
 
-                args = slice.call(arguments);
+                args = slice.call(arguments, 2);
                 marray.each(args, function(v) {
                     mobject.each(v, function(value, key) {
                         instance[key] = value;
                     });
-                }, 2);
+                });
                 return this;
             },
 
             extend: function(dest, args) {
                 dest = dest || {};
-                args = slice.call(arguments);
+
+                var cover = true;
+                arguments[arguments.length - 1] === true && (cover = false); //当最后一个参数为true，则表示不覆盖同名属性
+
+                args = slice.call(arguments, 1, cover ? arguments.length : arguments.length - 1);
                 marray.each(args, function(v) {
                     mobject.each(v, function(value, key) {
+                        if (cover && mobject.hasKey(dest, key))
+                            return;
                         dest[key] = value;
                     });
-                }, 1);
+                });
                 return dest;
             },
 
@@ -1603,8 +1609,8 @@
         },
 
         trigger: function(tg, ty, data, scope) {
-            var ismouse = mouseEventTypes.indexOf(ty) > -1;
             try {
+                var ismouse = mouseEventTypes.indexOf(ty) > -1;
                 var e = document.createEvent(ismouse ? 'MouseEvents' : 'HTMLEvents');
                 data && (e.data = data);
                 scope || (scope = tg);
@@ -1736,6 +1742,8 @@
     }
 
     Dispatcher.prototype = {
+        constructor: Dispatcher,
+
         on: function(ty, fn, arg) {
             cevent.on(this, ty, fn, arg);
             return this;
@@ -2206,7 +2214,7 @@
 
     ///给值加上像素单位，当值为数值或无单位的字符串时
     function addPxUnit(value) {
-        if (mnumber.isNumber(value) || (mstring.isString(value) && parseFloat(value).toString() !== value))
+        if (mnumber.isNumber(value) || (mstring.isString(value) && parseFloat(value).toString() === value))
             return value + 'px';
         return value;
     }
@@ -2246,6 +2254,8 @@
 
     ///_M_类原型，便以对DOM元素的操作，支持链式调用(一些取值器方法和逻辑判断方法除外)
     base._ = _M_.prototype = {
+        constructor: _M_,
+
         each: function(fn, arg) {
             if (mfn.isFunction(fn)) {
                 var i = 0,
@@ -3632,50 +3642,67 @@
     });
 
     ///数据提供者，监听数据的变化
+    ///当传入的是字面量对象，则包装进数组里
+    ///所有的操作都是在数组基础上进行的
     function DataProvider(source) {
         if (!(this instanceof DataProvider))
             return new DataProvider(source);
 
         Dispatcher.call(this);
         this.__source = source ? (marray.isArray(source) && source || [source]) : [];
+        this.length = this.__source.length;
     }
 
     base.inherit(DataProvider, Dispatcher, {
+        ///设定DataProvider被谁所拥有，这里一般传入一个Model实例，以便对任何改变都可以派发事件到Model上去
         owner: function(o) {
             this.__owner = o;
             return this;
         },
 
-        ///取值：get(1)->[0,1]或get("key")->{key:xxx}或get("1.key")->[{key:xxx}]或get("item.key")->{item:{key:xxx}}
+        ///取值
+        ///当不传参数时，返回全部
+        ///简单数组：key为元素索引，如[0,1] -> get(1) ==>1
+        ///复杂数组，元素为字面量对象：key为元素索引或索引与键值的组合，如[{key:xxx},{key2:yyy}] -> get("0") ==> {key:xxx}，或get("1.key2") ==> yyy；当取第一个元素的某属性时，可以省略索引值，如get("key")等价于get("0.key")
+        ///简单字面量对象的数组包装（唯一的元素即是该字面量对象）：key为键值，如{key:xxx} -> get("key") ==> xxx；其实，在DataProvider中真正存在的结构是[{key:xxx}]，看起来像是只有一个元素的复杂数组
+        ///复杂字面量对象的数组包装（唯一的元素即是该复杂字面量对象）：key为键值组合，如{item:{key:xxx},item2:{key2:yyy}} -> get("item") ==> {key:xxx}，或get("item2.key2") ==>yyy
+        ///所有可能的取值：get(1)、get("1")、get("0.key")、get("key")、get("item")、get("item.key")、get("item.sub.key")、...
         get: function(key) {
+            if (base.isUndefined(key))
+                return this.__source;
+
             if (mnumber.isNumber(key))
                 return this.__source[key];
 
-            if (!mstring.isString(key))
-                return null;
+            if (mstring.isString(key)) {
+                key = key.split('.');
+                mnumber.isNumeric(key[0]) || (key.unshift('0'));
 
-            key = key.split('.');
-            mnumber.isNumeric(key[0]) || (key.unshift('0'));
-
-            for (var i = 0, l = key.length, d = this.__source; i < l; i++)
-                d = d[key[i]];
-            return d;
+                for (var i = 0, l = key.length, d = this.__source; i < l; i++)
+                    d = d[key[i]];
+                return d;
+            }
+            return null;
         },
 
-        ///设值，参数key同get方法，派发change事件
+        ///设值
+        ///参数key同get方法，派发change事件
+        ///当key=="^"，则表示将val内容插入到DataProvider头部；当key=="$"，则表示将val内容插入到DataProvider末尾。都会派发add事件
         set: function(key, value) {
-            function trigger(obj, key) {
-                obj.trigger('change:' + key).trigger('change');
-                if (obj.__owner && obj.__owner instanceof Dispatcher) {
-                    obj.__owner.trigger('change:' + key).trigger('change');
-                }
+            if (key === '^' || key === '$') {
+                this.__source.splice(key === '^' ? 0 : this.length, 0, value);
+                this.length = this.__source.length;
+                this.trigger('add', value);
+                this.__owner && this.__owner.trigger('add', value);
+                return this;
             }
 
             if (mnumber.isNumber(key)) {
                 var o = this.__source[key];
                 if (o !== value) {
                     this.__source[key] = value;
-                    trigger(this, key);
+                    this.trigger('change:' + key, [value, o]).trigger('change', [key, value, o]);
+                    this.__owner && this.__owner.trigger('change:' + key, [value, o]).trigger('change', [key, value, o]);
                 }
                 return this;
             }
@@ -3700,34 +3727,41 @@
                     d = d[ks[i]];
 
                 var o = d[ks[l - 1]];
-                if (o !== value) {
-                    d[ks[l - 1]] = value;
-                    trigger(this, k);
+                if (o !== v) {
+                    d[ks[l - 1]] = v;
+                    this.trigger('change:' + k, [v, o]).trigger('change', [k, v, o]);
+                    this.__owner && this.__owner.trigger('change:' + k, [v, o]).trigger('change', [k, v, o]);
                 }
             });
             return this;
         },
 
-        ///重设数据源，派发change事件
+        ///重设数据源，派发reset事件
         reset: function(source, silent) {
             marray.isArray(source) || (source = [source]);
             this.__source = source;
+            this.length = source.length;
             if (!silent) {
-                this.trigger('change');
-                this.__owner && this.__owner instanceof Dispatcher && this.__owner.trigger('change');
+                this.trigger('reset');
+                this.__owner && this.__owner.trigger('reset');
             }
             return this;
         },
 
         ///取消指定字段，派发unset事件
+        ///当不传递参数时，表示清空数据，等价于clear方法
         unset: function(key) {
             function trigger(obj, key) {
                 obj.trigger('unset', key);
-                obj.__owner && obj.__owner instanceof Dispatcher && obj.__owner.trigger('unset', key);
+                obj.__owner && obj.__owner.trigger('unset', key);
             }
+
+            if (base.isUndefined(key))
+                return this.clear();
 
             if (mnumber.isNumber(key)) {
                 this.__source.splice(key, 1);
+                this.length = this.__source.length;
                 trigger(this, key);
                 return this;
             }
@@ -3745,6 +3779,7 @@
             for (; i < l - 1; i++)
                 d = d[ks[i]];
             marray.isArray(d) ? d.splice(ks[l - 1], 1) : (delete d[ks[l - 1]]);
+            this.length = this.__source.length;
             trigger(this, key);
             return this;
         },
@@ -3756,7 +3791,7 @@
 
         ///检测数据源中是否存在指定数据项
         find: function(item) {
-            for (var i = 0, l = this.__source.length; i < l; i++) {
+            for (var i = 0, l = this.length; i < l; i++) {
                 if (this.__source[i] === item)
                     return true;
             }
@@ -3766,8 +3801,9 @@
         ///清空数据源，派发clear事件
         clear: function() {
             this.__source = [];
+            this.length = 0;
             this.trigger('clear');
-            this.__owner && this.__owner instanceof Dispatcher && this.__owner.trigger('clear');
+            this.__owner && this.__owner.trigger('clear');
             return this;
         },
 
@@ -3790,7 +3826,7 @@
         },
 
         isEmpty: function() {
-            return !this.__source.length;
+            return !this.length;
         }
     });
 
@@ -3870,6 +3906,10 @@
 
         pick: function(key1, key2, key3) {
             return this.provider.pick.apply(this.provider, arguments);
+        },
+
+        length: function() {
+            return this.provider.length;
         },
 
         isEmpty: function() {
@@ -3954,6 +3994,18 @@
 
     base.Model = Model;
 
+
+    ///将原型链上的events对象合并进来
+    function chainEvents(view) {
+        var events = view.events || {},
+            __proto__ = view.__proto__;
+        while (__proto__) {
+            base.extend(events, __proto__.events, false); //不覆盖后添加的同名事件，也就是说子类永远覆盖父类
+            __proto__ = __proto__.__proto__;
+        }
+        return events;
+    }
+
     ///UI视图
     function View(el, model) {
         if (!(this instanceof View))
@@ -3964,6 +4016,8 @@
         this.model = model;
         this.initialize();
         this.render();
+
+        this.events = chainEvents(this);
         this.delegate();
 
         var _ = this;
@@ -3979,7 +4033,8 @@
 
             View.call(this, el, model);
         }
-        base.inherit(NView, View, obj);
+        base.inherit(NView, this, obj);
+        base.extend(NView, this);
         return NView;
     }
 
