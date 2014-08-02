@@ -488,6 +488,15 @@
                         t = t.replace(r[0], v[r[1]]);
                     return t;
                 }).join('');
+            },
+
+            ///延迟某时长(ms)再执行指定的函数
+            delay: function(time, fn, args, scope) {
+                var timer = setTimeout(function() {
+                    (clearTimeout(timer), timer = null);
+                    fn.apply(scope, args);
+                }, time);
+                return this;
             }
         };
 
@@ -3308,17 +3317,23 @@
             return this;
         },
 
-        show: function() {
-            this.each(function() {
-                this.style.display = '';
-            });
+        show: function(delay) {
+            function ex() {
+                this.each(function() {
+                    this.style.display = '';
+                });
+            }
+            delay > 0 ? this.delay(delay, ex) : ex.call(this);
             return this;
         },
 
-        hide: function() {
-            this.each(function() {
-                this.style.display = 'none';
-            });
+        hide: function(delay) {
+            function ex() {
+                this.each(function() {
+                    this.style.display = 'none';
+                });
+            }
+            delay > 0 ? this.delay(delay, ex) : ex.call(this);
             return this;
         },
 
@@ -3629,6 +3644,11 @@
             return this.each(function() {
                 return regExp.test(this.value);
             });
+        },
+
+        delay: function(time, fn, args) {
+            base.delay(time, fn, args, this);
+            return this;
         }
     };
 
@@ -4015,14 +4035,19 @@
         this.ui = My(el);
         this.model = model;
         this.initialize();
+
+        this.renderbefore();
         this.render();
+        this.renderafter();
 
         this.events = chainEvents(this);
         this.delegate();
 
         var _ = this;
         this.model && this.model.on('render', function() {
+            _.renderbefore();
             _.render();
+            _.renderafter();
         });
     }
 
@@ -4059,16 +4084,18 @@
             return base.template(this.tpl, this.model && this.model.toSource() || []);
         },
 
-        renderbefore: function() {},
-
-        render: function() {
-            this.renderbefore();
-            this.ui.html(this.template());
-            this.renderafter();
+        renderbefore: function() {
             return this;
         },
 
-        renderafter: function() {},
+        render: function() {
+            this.ui.html(this.template());
+            return this;
+        },
+
+        renderafter: function() {
+            return this;
+        },
 
         remove: function() {
             this.model && this.model.release();
