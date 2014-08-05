@@ -2,10 +2,10 @@
  ***********************************************************************************************
  ***  My JavaScript Library v1.0.0             **          **     ***     ***                ***
  ***  @name:My                                 ****      ****      ***   ***                 ***
- ***  @version:1.0.0                           ** ***  **** *       **  ***                  ***
+ ***  @version:1.0.3                           ** ***  **** *       **  ***                  ***
  ***  @author:Luoying                          **     *    **        * ***                   ***
  ***  @date:2013-7-1                           **          **         ***                    ***
- ***  @modify:2014-7-3                         **          **        ***                     ***
+ ***  @last modified:2014-8-5                  **          **        ***                     ***
  ***  @copyright:China                         **          **       ***                      ***
  ***  @comment:No support for old browser      **          **      ***                       ***
  ***********************************************************************************************
@@ -16,7 +16,7 @@
     }
 
     My.name = 'My';
-    My.version = '1.0.1';
+    My.version = '1.0.3';
     My.isReady = false;
     window.M = window.My = My;
 
@@ -42,6 +42,10 @@
 
             isDomElement: function(obj) {
                 return obj && obj.nodeType === 1;
+            },
+
+            isDocument: function(obj) {
+                return obj && obj.nodeType === 9;
             },
 
             clone: function(data, isDepth) {
@@ -477,7 +481,7 @@
             },
 
             template: function(tpl, data) {
-                if (!tpl || !data) return '';
+                if (!tpl || !data) return tpl;
 
                 marray.isArray(data) || (data = [data]);
 
@@ -494,7 +498,7 @@
             delay: function(time, fn, args, scope) {
                 var timer = setTimeout(function() {
                     (clearTimeout(timer), timer = null);
-                    fn.apply(scope, args);
+                    fn.apply(scope, marray.isArray(args) && args || [args]);
                 }, time);
                 return this;
             }
@@ -794,7 +798,7 @@
         },
 
         isArrayLike: function(obj) {
-            if (obj == null || obj == window || obj.document)
+            if (obj == null || obj == window || obj === document)
                 return false;
 
             var length = obj.length;
@@ -2012,9 +2016,16 @@
 
     function parseLoaderData(type, text, xml) {
         return {
-            json: JSON.parse(text),
-            xml: xml
-        }[type] || text;
+            json: function() {
+                return JSON.parse(text);
+            },
+            xml: function() {
+                return xml;
+            },
+            txt: function() {
+                return text;
+            }
+        }[type]() || text;
     }
 
     function setLoaderTimeout(loader) {
@@ -2126,9 +2137,16 @@
 
     function parseXssData(type, data) {
         return {
-            json: JSON.parse(data),
-            xml: base.parseXML(data)
-        }[type] || data;
+            json: function() {
+                return JSON.parse(data);
+            },
+            xml: function() {
+                return base.parseXML(data);
+            },
+            txt: function() {
+                return data;
+            }
+        }[type]() || data;
     }
 
     function setXssError(xss) {
@@ -2246,11 +2264,13 @@
             return s;
 
         this[0] = null; //DOM树，存储每一个匹配的DOM元素，如[0]、[1]、[2]等
+        this.context = base.isDocument(p) && p || document; //文档环境。有可能是iframe里的元素，此时其文档环境应为iframe所在页面的文档环境，级s.ownerDocument
         this.length = 0; //DOM元素个数
 
         if (s) {
             if (base.isDomElement(s) || s === document || s === window) {
                 this[0] = s;
+                this.context = s.ownerDocument || document;
                 this.length = 1;
             } else if (mstring.isString(s)) {
                 insertElements(mhtml.is(s) ? mhtml.parse(s) : base.query(s, p), this);
@@ -2302,7 +2322,7 @@
             if (mfn.isFunction(fn)) {
                 return new _M_(marray.map(this, function(o, i) {
                     return fn.call(o, o, i, arg);
-                }));
+                }), this.context);
             }
             return this;
         },
@@ -2335,22 +2355,22 @@
         },
 
         first: function() {
-            return new _M_(this[0]);
+            return new _M_(this[0], this.context);
         },
 
         last: function() {
-            return new _M_(this[this.length - 1]);
+            return new _M_(this[this.length - 1], this.context);
         },
 
         ///按序号获取元素，序号从1开始
         nth: function(eq) {
-            return new _M_(this.get(eq - 1));
+            return new _M_(this.get(eq - 1), this.context);
         },
 
         ///判断DOM元素集合中是否包含目标元素
         has: function(selector) {
             if (selector) {
-                var a = My(selector),
+                var a = My(selector, this.context),
                     h = false;
                 this.each(function() {
                     for (var i = 0, l = a.length; i < l; i++) {
@@ -2373,27 +2393,27 @@
         ///剔除指定的元素
         not: function(selector) {
             var cc = [],
-                a = My(selector);
+                a = My(selector, this.context);
             a.length && this.each(function() {
                 for (var i = 0, l = a.length; i < l; i++) {
                     this === a[i] || cc.push(this);
                 }
             }) || (cc = this.elements());
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///过滤出来指定的元素
         filter: function(selector) {
             var cc = [];
             if (selector) {
-                var a = My(selector);
+                var a = My(selector, this.context);
                 this.each(function() {
                     for (var i = 0, l = a.length; i < l; i++) {
                         this === a[i] && cc.push(this);
                     }
                 });
             }
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///搜寻指定的节点。此方法会往下遍寻每个元素的整棵DOM树，直到DOM树的最深节点为止
@@ -2424,7 +2444,7 @@
                     });
                 }
             }
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///检索DOM各元素的所有直接子节点集合，此方法不会往下遍寻元素的整棵DOM树
@@ -2451,12 +2471,12 @@
                     c.tagName && (selector && a(c) || cc.push(c));
                 });
             });
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///检索元素（第一个元素）父节点
         parent: function() {
-            return new _M_(this[0] && this[0].parentNode);
+            return new _M_(this[0] && this[0].parentNode, this.context);
         },
 
         ///检索元素（第一个元素）的所有或指定的祖先（往上遍寻父级）
@@ -2467,7 +2487,7 @@
                 e = e.parentNode;
                 while (e && base.isDomElement(e)) {
                     if (selector) {
-                        My(e.parentNode).children(selector).length && (cc[cc.length++] = e);
+                        My(e).is(selector) && (cc[cc.length++] = e);
                         e = e.parentNode;
                         continue;
                     }
@@ -2476,7 +2496,7 @@
                     e = e.parentNode;
                 }
             }
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///将目标元素插入到DOM各元素子节点的头部，作为各元素的第一个子节点
@@ -2595,7 +2615,7 @@
                     });
                 });
             }
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///将本My对象中的元素替换给目标元素，此方法与replace方法刚好是反过来的关系
@@ -2644,7 +2664,7 @@
                     }
                 }
             });
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///对DOM元素执行清除操作，包括绑定的事件和数据
@@ -2673,7 +2693,7 @@
                     p && cc.indexOf(p) === -1 && cc.push(p);
                 }
             });
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///检索所有前面兄弟元素
@@ -2695,7 +2715,7 @@
                 var $ = new _M_(this.parentNode).children(selector); //因为所有兄弟节点都拥有共同的父节点，所以只需取得一次就可以了
                 $.length && iterate(this);
             });
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///检索后一个兄弟元素
@@ -2717,7 +2737,7 @@
                     n && cc.indexOf(n) === -1 && cc.push(n);
                 }
             });
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///检索所有后面兄弟元素
@@ -2739,7 +2759,7 @@
                 var $ = new _M_(this.parentNode).children(selector); //因为所有兄弟节点都拥有共同的父节点，所以只需取得一次就可以了
                 $.length && iterate(this);
             });
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///检索所有兄弟元素
@@ -2767,14 +2787,14 @@
                 var $ = new _M_(this.parentNode).children(selector); //因为所有兄弟节点都拥有共同的父节点，所以只需取得一次就可以了
                 $.length && iterate(this);
             });
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         ///复制元素节点，isdepth：指示被复制的节点是否包括原节点的所有属性和子节点
         clone: function(isdepth) {
             return new _M_(this.map(function() {
                 return this.cloneNode(isdepth);
-            }));
+            }), this.context);
         },
 
         ///innerHTML
@@ -2853,7 +2873,7 @@
                     cc.push(this);
                 }
             });
-            return new _M_(cc);
+            return new _M_(cc, this.context);
         },
 
         /*
@@ -3158,7 +3178,7 @@
         ///检索DOM元素的最近动态定位包含元素，如通过relative/absoute/fixed等设置position的，所有的偏移量都根据该元素来决定
         offsetParent: function() {
             var e = this[0];
-            return new _M_(e && e.offsetParent);
+            return new _M_(e && e.offsetParent, this.context);
         },
 
         /*
@@ -3428,15 +3448,16 @@
          */
         style: function(name, value) {
             if (value === undefined && !mobject.isPlainObject(name)) {
-                var e = this[0];
+                var e = this[0],
+                    doc = this.context;
                 if (e) {
                     function attrStyle(attr) {
                         if (e.style[attr])
                             return e.style[attr];
                         if (e.currentStyle)
                             return e.currentStyle[attr];
-                        if (document.defaultView && document.defaultView.getComputedStyle)
-                            return document.defaultView.getComputedStyle(e, null).getPropertyValue(mstring.joinCase(attr));
+                        if (doc.defaultView && doc.defaultView.getComputedStyle)
+                            return doc.defaultView.getComputedStyle(e, null).getPropertyValue(mstring.joinCase(attr));
                         return null;
                     }
 
@@ -3585,7 +3606,7 @@
                 isM = !isE && base.isMy(parts);
 
             if (isS || isE || isM) {
-                var $ = new _M_();
+                var $ = new _M_(null, this.context);
                 (isE || isM) && $.add(parts) || this.each(function() {
                     $.add(base.query(parts, this));
                 });
@@ -3619,14 +3640,14 @@
                         pre = cur;
                     },
                     onup = function(e) {
-                        My(document.body).off('mousemove', onmove).off('mouseup', onup).off('mouseleave', onup);
+                        My($.context.body).off('mousemove', onmove).off('mouseup', onup).off('mouseleave', onup);
                         target = null;
                         pre = null;
                     };
 
                 this.mousedown(function(e) {
                     if ($.has(e.target) || $.find(e.target).length) {
-                        My(document.body).mousemove(onmove).mouseup(onup).mouseleave(onup);
+                        My($.context.body).mousemove(onmove).mouseup(onup).mouseleave(onup);
                         pre = {
                             x: e.pageX,
                             y: e.pageY
@@ -3646,8 +3667,8 @@
             });
         },
 
-        delay: function(time, fn, args) {
-            base.delay(time, fn, args, this);
+        delay: function(time, fn, args, scope) {
+            base.delay(time, fn, args, scope || this);
             return this;
         }
     };
@@ -3946,12 +3967,11 @@
 
         ///从远程服务器获取数据，并更新模型的数据
         load: function() {
-            var loader = new Loader(),
+            var loader = new Loader(this.url),
                 _ = this;
-            loader.url = this.url;
             loader.once({
-                success: function(data) {
-                    data = _.loadafter(this.data);
+                success: function(evt) {
+                    var data = _.loadafter(this.data);
                     data && _.reset(data, true);
                     _.trigger('load');
                     this.release();
@@ -3973,19 +3993,19 @@
         commitbefore: function(loader) {},
 
         ///commit数据完毕之后，有一次机会设定响应结果，因为这个响应结果也许并非我们所需要的，该函数就提供了一次整理结果的机会
-        loadafter: function(result) {
+        commitafter: function(result) {
             return result;
         },
 
         ///提交模型数据到远程服务器
         commit: function() {
-            var loader = new Loader(),
+            var loader = new Loader(this.url, {
+                    method: 'post',
+                    params: this.get(0)
+                }),
                 _ = this;
-            loader.url = this.url;
-            loader.method = 'post';
-            loader.params = this.toSource();
             loader.once({
-                success: function(data) {
+                success: function(evt) {
                     _.trigger('commit', _.loadafter(this.data));
                     this.release();
                 },
@@ -4081,7 +4101,7 @@
         },
 
         template: function() {
-            return base.template(this.tpl, this.model && this.model.toSource() || []);
+            return base.template(this.tpl, this.model && this.model.toSource());
         },
 
         renderbefore: function() {
