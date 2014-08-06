@@ -5,7 +5,7 @@
  ***  @version:1.0.3                           ** ***  **** *       **  ***                  ***
  ***  @author:Luoying                          **     *    **        * ***                   ***
  ***  @date:2013-7-1                           **          **         ***                    ***
- ***  @last modified:2014-8-5                  **          **        ***                     ***
+ ***  @last modified:2014-8-6                  **          **        ***                     ***
  ***  @copyright:China                         **          **       ***                      ***
  ***  @comment:No support for old browser      **          **      ***                       ***
  ***********************************************************************************************
@@ -3367,7 +3367,7 @@
         ///返回元素的可见性(display或visibility状态)，只返回第一个元素
         visible: function() {
             var e = this[0];
-            return e && (e.style.display !== '' && e.style.visibility !== 'hidden');
+            return e && e.style.display !== 'none' && e.style.visibility !== 'hidden';
         },
 
         ///设置或检索DOM第一个元素的类样式
