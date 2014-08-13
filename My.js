@@ -1,11 +1,11 @@
 /*
  ***********************************************************************************************
- ***  My JavaScript Library v1.0.0             **          **     ***     ***                ***
+ ***  My JavaScript Library v1.0.5             **          **     ***     ***                ***
  ***  @name:My                                 ****      ****      ***   ***                 ***
- ***  @version:1.0.3                           ** ***  **** *       **  ***                  ***
+ ***  @version:1.0.5                           ** ***  **** *       **  ***                  ***
  ***  @author:Luoying                          **     *    **        * ***                   ***
  ***  @date:2013-7-1                           **          **         ***                    ***
- ***  @last modified:2014-8-6                  **          **        ***                     ***
+ ***  @last modified:2014-8-13                  **          **        ***                     ***
  ***  @copyright:China                         **          **       ***                      ***
  ***  @comment:No support for old browser      **          **      ***                       ***
  ***********************************************************************************************
@@ -16,7 +16,7 @@
     }
 
     My.name = 'My';
-    My.version = '1.0.3';
+    My.version = '1.0.5';
     My.isReady = false;
     window.M = window.My = My;
 
@@ -443,32 +443,51 @@
                 }
             },
 
-            on: function(tg, ty, fn, arg) {
-                isOriginalEvent(tg, ty) ? devent.on(tg, ty, fn, arg) : cevent.on(tg, ty, fn, arg);
+            on: function(target, type, fn, arg) {
+                type = toObjectEvents(type, fn, arg);
+                (arg = type[1], type = type[0]);
+
+                mobject.each(type, function(f, k) {
+                    var obj = isOriginalEvent(target, k) ? devent : cevent;
+                    obj.on(target, k, f, arg);
+                });
                 return this;
             },
 
-            once: function(tg, ty, fn, arg) {
-                isOriginalEvent(tg, ty) ? devent.once(tg, ty, fn, arg) : cevent.once(tg, ty, fn, arg);
+            once: function(target, type, fn, arg) {
+                type = toObjectEvents(type, fn, arg);
+                (arg = type[1], type = type[0]);
+
+                mobject.each(type, function(f, k) {
+                    var obj = isOriginalEvent(target, k) ? devent : cevent;
+                    obj.once(target, k, f, arg);
+                });
                 return this;
             },
 
-            off: function(tg, ty, fn) {
-                isOriginalEvent(tg, ty) ? devent.off(tg, ty, fn) : cevent.off(tg, ty, fn);
+            off: function(target, type, fn) {
+                type = toObjectEvents(type, fn)[0];
+                mobject.each(type, function(f, k) {
+                    var obj = isOriginalEvent(target, k) ? devent : cevent;
+                    obj.off(target, k, f);
+                });
                 return this;
             },
 
-            listened: function(tg, ty) {
-                return isOriginalEvent(tg, ty) ? devent.listened(tg, ty) : cevent.listened(tg, ty);
+            listened: function(target, type) {
+                var obj = isOriginalEvent(target, type) ? devent : cevent;
+                return obj.listened(target, type);
             },
 
-            release: function(tg, ty) {
-                isOriginalEvent(tg, ty) ? devent.release(tg, ty) : cevent.release(tg, ty);
+            release: function(target, type) {
+                var obj = isOriginalEvent(target, type) ? devent : cevent;
+                obj.release(target, type);
                 return this;
             },
 
-            trigger: function(tg, ty, data, scope) {
-                isOriginalEvent(tg, ty) ? devent.trigger(tg, ty, data, scope) : cevent.trigger(tg, ty, data, scope);
+            trigger: function(target, type, data, scope) {
+                var obj = isOriginalEvent(target, type) ? devent : cevent;
+                obj.trigger(target, type, data, scope);
                 return this;
             },
 
@@ -1402,6 +1421,7 @@
             'mouseenter',
             'mouseleave',
             'mousewheel',
+            'DOMMouseScroll',
             'drag',
             'drop',
             'dragstart',
@@ -1469,8 +1489,14 @@
         ///当前事件对象映射guid
         eventGuid = 0,
 
+        toObjectEvents = function(type, fn, arg) {
+            var types = type;
+            mstring.isString(type) && (types = {}, types[type] = fn, fn = arg);
+            return [types, fn];
+        },
+
         isOriginalEvent = function(tg, ty) {
-            return (base.isDomElement(tg) || tg == window || tg == document) && marray.contains(originalEventTypes, ty);
+            return ('on' + ty) in tg;
         },
 
         ///合并原生的DOM事件类型和自定义事件类型
@@ -1519,6 +1545,21 @@
         return guid;
     }
 
+    function checkEvent(tg, ty) {
+        if (!(('on' + ty) in tg)) {
+            ty === 'mousewheel' && (ty = 'DOMMouseScroll');
+        }
+        return ty;
+    }
+
+    function resetEvent(evt) {
+        if (evt.type === 'DOMMouseScroll') {
+            evt.wheelDelta = -evt.detail * 40;
+            evt.type = 'mousewheel';
+        }
+        return evt;
+    }
+
     ///针对DOM事件的一些方法
     var devent = {
         on: function(tg, ty, fn, arg) {
@@ -1528,11 +1569,13 @@
 
                 var handler = function(e) {
                     var callee = arguments.callee;
-                    callee.fn.call(this, e, callee.arg); //将event对象作为参数传递给处理函数
+                    callee.fn.call(this, resetEvent(e), callee.arg); //将event对象作为参数传递给处理函数
                 }
                 handler.fn = fn;
                 handler.arg = arg;
                 eventHandlers[guid][ty].push(handler);
+
+                ty = checkEvent(tg, ty);
                 tg.addEventListener(ty, handler, false);
             }
 
@@ -1551,6 +1594,7 @@
                 var handlers = this.handlers(tg, ty);
                 marray.each(handlers, function(v, i) {
                     if (v.fn === fn || v.fn.sfn === fn) {
+                        ty = checkEvent(tg, ty);
                         tg.removeEventListener(ty, v, false);
                         handlers.splice(i, 1);
                         delete v.fn.sfn;
@@ -3719,8 +3763,10 @@
                 key = key.split('.');
                 mnumber.isNumeric(key[0]) || (key.unshift('0'));
 
-                for (var i = 0, l = key.length, d = this.__source; i < l; i++)
+                for (var i = 0, l = key.length, d = this.__source; i < l; i++) {
                     d = d[key[i]];
+                    if (d === undefined) break;
+                }
                 return d;
             }
             return null;
@@ -3760,12 +3806,16 @@
                 var ks = k.split('.'),
                     i = 0,
                     l = 0,
+                    n = null,
                     d = this.__source;
                 mnumber.isNumeric(ks[0]) || (ks.unshift('0'));
                 l = ks.length;
 
-                for (; i < l - 1; i++)
-                    d = d[ks[i]];
+                for (; i < l - 1; i++) {
+                    n = ks[i];
+                    d[n] === undefined && (d.push({}), d[d.length - 1][k] = undefined);
+                    d = d[n];
+                }
 
                 var o = d[ks[l - 1]];
                 if (o !== v) {
@@ -4048,19 +4098,20 @@
 
     ///UI视图
     function View(el, model) {
-        if (!(this instanceof View))
-            return new View(el, model);
+        var args = slice.call(arguments, 2);
+        !(model instanceof Model) && (args = [model], model = null);
 
         Dispatcher.call(this);
         this.ui = My(el);
         this.model = model;
-        this.initialize();
+        this.events = chainEvents(this);
+
+        this.initialize.apply(this, args);
 
         this.renderbefore();
         this.render();
         this.renderafter();
 
-        this.events = chainEvents(this);
         this.delegate();
 
         var _ = this;
@@ -4069,15 +4120,14 @@
             _.render();
             _.renderafter();
         });
+
+        this.initialized();
     }
 
-    View.extend = function(obj) {
-        function NView(el, model) {
-            if (!(this instanceof NView))
-                return new NView(el, model);
-
-            View.call(this, el, model);
-        }
+    View.extend = function(obj, name) {
+        eval('var NView=function ' + (name || 'NView') + '(el, model) {' +
+            'View.apply(this, arguments);' +
+            '}');
         base.inherit(NView, this, obj);
         base.extend(NView, this);
         return NView;
@@ -4091,12 +4141,22 @@
      *          "click a":function(evt,view){window.open();},
      *          "change? input":function(evt,view){alert("event is only once!")}
      *        },
-     *        initialize:function(){},
+     *        initialize:function(args){},
      *        render:function(){}
+     *    })
+     *
+     *如果要扩展一个View实例的功能，可以这样做（假设这个View实例为form）：
+     *    form.extend({
+     *       fn1:function(){},
+     *       fn2:function(){}
      *    })
      */
     base.inherit(View, Dispatcher, {
-        initialize: function() {
+        initialize: function(args) {
+            return this;
+        },
+
+        initialized: function() {
             return this;
         },
 
@@ -4154,6 +4214,12 @@
                 }, null, this);
             }
             return this;
+        },
+
+        extend: function(obj) {
+            obj || (obj = {});
+            obj.events && (this.undelegate(), base.extend(this.events, obj.events), this.delegate(), delete obj.events);
+            return base.extend(this, obj);
         }
     });
 
@@ -4195,6 +4261,196 @@
             return obj;
         }
     });
+
+
+    ///异步上传文件插件，支持多文件上传
+    function Multipart(url, opts) {
+        if (!(this instanceof Multipart))
+            return new Multipart(files, url, opts);
+
+        opts = base.extend(opts || {}, this.getDefaults());
+        Dispatcher.call(this);
+
+        this.url = url;
+        this.files = null;
+        this.fields = {};
+        this.name = opts.name;
+        this.filters = opts.filters;
+        this.maxSize = opts.maxSize;
+    }
+
+    base.inherit(Multipart, Dispatcher, {
+        upload: function(files, fields) {
+            this.files = files || [];
+            this.fields = fields || {};
+
+            marray.isArrayLike(this.files) || (this.files = [this.files]);
+
+            var fs = checkFiles(this);
+            if (!fs) return;
+
+            var _ = this;
+            var xhr = getUploader(this.url, this.name, fs, this.fields);
+            base.on(xhr, {
+                progress: function(evt) {
+                    _.trigger('progress', [evt.loaded, evt.total]);
+                },
+                load: function(evt) {
+                    (_.clear(), _.trigger('end', evt.target.responseText));
+                },
+                error: function(evt) {
+                    (_.clear(), _.trigger('error', {
+                        code: 100,
+                        message: '上传未知错误'
+                    }));
+                },
+                abort: function(evt) {
+                    (_.clear(), _.trigger('error', {
+                        code: 5,
+                        message: '上传被取消'
+                    }));
+                }
+            });
+            this.xhr = xhr;
+        },
+
+        cancel: function() {
+            this.xhr && this.xhr.abort();
+        },
+
+        clear: function() {
+            this.xhr = null;
+            this.files = null;
+            this.fields = {};
+        },
+
+        getDefaults: function() {
+            return {
+                name: 'file', //上传属性名，等同于表单字段，方便服务器获取文件，默认为"file"；可以是数组，为多文件上传的每个文件指定专属名
+                filters: ['*'], //文件类型过滤器，默认支持所有类型文件
+                maxSize: 2 //单文件大小限制，以M为单位，默认单文件最大2M
+            };
+        }
+    });
+
+    base.Multipart = Multipart;
+
+    function checkFiles(multipart) {
+        var files = multipart.files;
+        if (!files.length) {
+            multipart.trigger('error', {
+                code: 2,
+                message: '无文件'
+            });
+            return false;
+        }
+
+        var fs = filterFile(multipart.filters, files);
+        if (!fs.length) {
+            multipart.trigger('error', {
+                code: 3,
+                message: '文件类型不符合'
+            });
+            return false;
+        }
+
+        fs = fileSize(multipart.maxSize, fs);
+        if (!fs.length) {
+            multipart.trigger('error', {
+                code: 4,
+                message: '文件太大'
+            });
+            return false;
+        }
+        return fs;
+    }
+
+    function filterFile(filters, files) {
+        return marray.filter(files, function(file) {
+            file.type || (/\.(\w+)$/.test(file.name) && (file.type = getFileType(RegExp.$1))); //IE某些文件无type,需要检测补上
+
+            if (marray.contains(filters, '*') || filters.indexOf(file.type) >= 0)
+                return file;
+
+            for (var i = 0, l = filters.length; i < l; i++) {
+                var ts = filters[i].split('/');
+                if (ts[1] === '*') {
+                    return file.type.split('/')[0] === ts[0];
+                }
+            }
+        });
+    }
+
+    function fileSize(maxSize, files) {
+        return marray.filter(files, function(file) {
+            return file.size <= maxSize * 1024 * 1024;
+        });
+    }
+
+    function getFileType(ext) {
+        return {
+            "txt": "text/plain",
+            "xml": "text/xml",
+            "html": "text/html",
+            "htm": "text/html",
+            "css": "text/css",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "jpe": "image/jpeg",
+            "png": "image/png",
+            "gif": "image/gif",
+            "bmp": "image/bmp",
+            "ief": "image/ief",
+            "ico": "image/x-icon",
+            "icon": "image/x-icon",
+            "svg": "image/svg+xml",
+            "tiff": "image/tiff",
+            "tif": "image/tiff",
+            "js": "application/x-javascript",
+            "json": "application/json",
+            "pdf": "application/pdf",
+            "swf": "application/x-shockwave-flash",
+            "doc": "application/msword",
+            "xls": "application/vnd.ms-excel",
+            "ppt": "application/vnd.ms-powerpoint",
+            "bin": "application/octet-stream",
+            "binary": "application/octet-stream",
+            "exe": "application/octet-stream",
+            "class": "application/octet-stream",
+            "dll": "application/octet-stream",
+            "zip": "application/zip",
+            "mp2": "audio/mpeg",
+            "mp3": "audio/mpeg",
+            "mp4": "video/mpeg4",
+            "wav": "audio/x-wav",
+            "wma": "audio/x-ms-wma",
+            "avi": "video/x-msvideo",
+            "mpeg": "video/mpeg",
+            "mpg": "video/mpeg",
+            "mpe": "video/mpeg",
+            "mov": "video/quicktime",
+            "movie": "video/x-sgi-movie",
+            "wmv": "video/x-ms-wmv"
+        }[ext] || '';
+    }
+
+    function getUploader(url, name, files, fields) {
+        mstring.isString(name) && (name = [name]);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('post', url, true);
+
+        var fm = new FormData();
+        marray.each(files, function(file, i) {
+            fm.append(name[i] || name[0], file);
+        });
+
+        mobject.each(fields, function(v, k) {
+            fm.append(k, v);
+        });
+        xhr.send(fm);
+        return xhr;
+    }
 
 
     base.extend(My, base);

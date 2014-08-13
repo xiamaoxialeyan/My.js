@@ -42,8 +42,8 @@ var server = http.createServer(function(req, res) {
             });
         }
     });
-}).listen(8080, 'lib.dodo.com.cn');
+}).listen(8888, 'lib.dodo.com.cn');
 
 vhost('lib.dodo.com.cn', server);
 
-console.log('Server running at http://lib.dodo.com.cn:8080');
+console.log('Server running at http://lib.dodo.com.cn:8888');
