@@ -1,11 +1,11 @@
 /*
  ***********************************************************************************************
- ***  My JavaScript Library v1.0.5             **          **     ***     ***                ***
+ ***  My JavaScript Library v1.0.6             **          **     ***     ***                ***
  ***  @name:My                                 ****      ****      ***   ***                 ***
- ***  @version:1.0.5                           ** ***  **** *       **  ***                  ***
+ ***  @version:1.0.6                           ** ***  **** *       **  ***                  ***
  ***  @author:Luoying                          **     *    **        * ***                   ***
  ***  @date:2013-7-1                           **          **         ***                    ***
- ***  @last modified:2014-8-13                  **          **        ***                     ***
+ ***  @last modified:2014-8-18                  **          **        ***                     ***
  ***  @copyright:China                         **          **       ***                      ***
  ***  @comment:No support for old browser      **          **      ***                       ***
  ***********************************************************************************************
@@ -16,7 +16,7 @@
     }
 
     My.name = 'My';
-    My.version = '1.0.5';
+    My.version = '1.0.6';
     My.isReady = false;
     window.M = window.My = My;
 
@@ -221,14 +221,14 @@
                 return null;
             },
 
-            range: function(first, second, step, type) {
+            range: function(first, second, step, prefix, suffix, type) {
                 type = type || 'array';
 
                 if (type === 'array')
-                    return marray.range(first, second, step);
+                    return marray.range(first, second, step, prefix, suffix);
 
                 if (type === 'string')
-                    return mstring.range(first, second, step);
+                    return mstring.range(first, second, step, prefix, suffix);
 
                 return null;
             },
@@ -567,8 +567,8 @@
             return s;
         },
 
-        range: function(first, second, step) {
-            return marray.range(first, second, step).join('');
+        range: function(first, second, step, prefix, suffix) {
+            return marray.range(first, second, step, prefix, suffix).join('');
         },
 
         fill: function(s, start, number, value) {
@@ -847,7 +847,7 @@
             return s;
         },
 
-        range: function(first, second, step) {
+        range: function(first, second, step, prefix, suffix) {
             if (base.isUndefined(first) || base.isUndefined(second))
                 return [];
 
@@ -871,7 +871,10 @@
 
             var s = [],
                 fn = function(a) {
-                    return isNumber ? a : String.fromCharCode(a);
+                    var v = isNumber ? a : String.fromCharCode(a);
+                    prefix && (v = prefix.toString() + v);
+                    suffix && (v = v + suffix.toString());
+                    return v;
                 };
 
             if (first <= second) {
